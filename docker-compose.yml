@@ -1,0 +1,60 @@
+services:
+  postgres:
+    image: postgres:16
+    environment:
+      POSTGRES_USER: ems
+      POSTGRES_PASSWORD: ems_dev_password
+      POSTGRES_DB: ems
+    ports: ["5432:5432"]
+    volumes: [pgdata:/var/lib/postgresql/data]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ems -d ems"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+  influxdb:
+    image: influxdb:2.7
+    environment:
+      DOCKER_INFLUXDB_INIT_MODE: setup
+      DOCKER_INFLUXDB_INIT_USERNAME: admin
+      DOCKER_INFLUXDB_INIT_PASSWORD: ems_dev_password
+      DOCKER_INFLUXDB_INIT_ORG: unityess
+      DOCKER_INFLUXDB_INIT_BUCKET: telemetry_1y
+      DOCKER_INFLUXDB_INIT_RETENTION: 365d
+      DOCKER_INFLUXDB_INIT_ADMIN_TOKEN: ems_dev_token
+    ports: ["8086:8086"]
+    volumes: [influxdata:/var/lib/influxdb2]
+    healthcheck:
+      test: ["CMD", "influx", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+  influx-init:
+    image: influxdb:2.7
+    depends_on:
+      influxdb: { condition: service_healthy }
+    restart: "no"
+    entrypoint: ["/bin/sh", "-c"]
+    command:
+      - >
+        influx bucket create --host http://influxdb:8086 --token ems_dev_token
+        --org unityess --name telemetry_raw_90d --retention 90d
+        || echo "telemetry_raw_90d already exists"
+
+  redis:
+    image: redis:7
+    command: ["redis-server", "--appendonly", "yes", "--appendfsync", "everysec"]
+    ports: ["6380:6379"]
+    volumes: [redisdata:/data]
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+volumes:
+  pgdata:
+  influxdata:
+  redisdata:

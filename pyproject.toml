@@ -1,0 +1,41 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "ems-backend"
+version = "0.1.0"
+requires-python = ">=3.11"
+dependencies = [
+  "fastapi",
+  "uvicorn[standard]",
+  "pydantic[email]",
+  "pydantic-settings",
+  "sqlalchemy[asyncio]",
+  "asyncpg",
+  "alembic",
+  "influxdb-client[async]",
+  "redis",
+  "pyjwt",
+  "argon2-cffi",
+  "python-multipart",
+  "orjson",
+  "structlog",
+  "pandas",
+  "numpy",
+  "websockets",
+]
+
+[project.optional-dependencies]
+dev = [
+  "pytest",
+  "pytest-asyncio",
+  "httpx",
+  "ruff",
+  "mypy",
+  "testcontainers",
+]
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["src*"]
