@@ -27,5 +27,5 @@ ROLE_PERMISSIONS = {
 # Default allowed state when seeding an org: reads ON, sensitive writes OFF
 DEFAULT_ORG_PERMISSION_ALLOWED = {p: True for p in PERMISSIONS}
 for _p in ("config:write", "command:write", "data:export",
-           "user:manage", "site:manage", "org:manage"):
+           "site:manage", "org:manage"):
     DEFAULT_ORG_PERMISSION_ALLOWED[_p] = False

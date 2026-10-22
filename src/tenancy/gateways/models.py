@@ -15,7 +15,8 @@ class GatewayModel(BaseEntityModel):
         UUID(as_uuid=True), ForeignKey("sites.id", ondelete="CASCADE"), index=True
     )
     gateway_key: Mapped[str] = mapped_column(String(64), unique=True)
-    client_id: Mapped[str] = mapped_column(String(128))
+    # client_id: Mapped[str] = mapped_column(String(128))
+    client_id: Mapped[str] = mapped_column(String(128), unique=True)
     client_secret_hash: Mapped[str] = mapped_column(String(255))
     enabled: Mapped[bool] = mapped_column(Boolean, default=True, server_default="true")
     software_version: Mapped[str | None] = mapped_column(String(64))

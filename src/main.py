@@ -3,7 +3,10 @@ from fastapi.responses import JSONResponse
 from redis.asyncio import Redis
 from sqlalchemy import text
 
-from src.auth.router import router as auth_router      # <-- add
+from src.accounts.gateways_router import router as gateways_router
+from src.accounts.router import router as accounts_router
+from src.auth.router import router as auth_router  
+from src.accounts.operators_router import router as operators_router
 from src.config import get_settings
 from src.database import engine
 from src.logging import configure_logging
@@ -41,6 +44,9 @@ def create_app() -> FastAPI:
         )
 
     app.include_router(auth_router)      # <-- add (mounts /api/v1/auth/*)
+    app.include_router(accounts_router) 
+    app.include_router(operators_router) 
+    app.include_router(gateways_router)  # mounts /api/v1/admin/sites/{site_id}/gateways
     return app
 
 

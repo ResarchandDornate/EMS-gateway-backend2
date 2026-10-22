@@ -1,12 +1,12 @@
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from src.rbac.models import (OrganizationPermissionModel, PermissionModel,
-                             RoleModel, RolePermissionModel)
-from src.rbac.permissions import (DEFAULT_ORG_PERMISSION_ALLOWED, PERMISSIONS,
-                                  ROLE_PERMISSIONS, ROLES)
+from src.rbac.models import (OrganizationPermissionModel, PermissionModel,RoleModel, RolePermissionModel)
+from src.rbac.permissions import (DEFAULT_ORG_PERMISSION_ALLOWED, PERMISSIONS, ROLE_PERMISSIONS, ROLES)
 from src.tenancy.organizations.models import OrganizationModel
-
+from src.rbac.models import UserRoleModel, UserSiteAccessModel
+from src.tenancy.gateways.models import GatewayModel
+from src.tenancy.sites.models import SiteModel
 
 async def seed_roles_permissions(session: AsyncSession) -> None:
     """Idempotent: creates roles, permissions, and role_permissions if missing."""
@@ -56,3 +56,65 @@ async def backfill_org_permissions(session: AsyncSession) -> int:
     for org in orgs:
         total += await seed_org_permissions(session, org.id)
     return total
+
+
+async def get_user_roles(session, user_id):
+    result = await session.execute(
+        select(RoleModel.name)
+        .join(UserRoleModel, UserRoleModel.role_id == RoleModel.id)
+        .where(UserRoleModel.user_id == user_id)
+    )
+    return set(result.scalars())
+
+
+async def get_user_permissions(session, user):
+    roles = await get_user_roles(session, user.id)
+    if "super_admin" in roles:
+        return set(PERMISSIONS)
+
+    result = await session.execute(
+        select(PermissionModel.name)
+        .join(RolePermissionModel, RolePermissionModel.permission_id == PermissionModel.id)
+        .join(UserRoleModel, UserRoleModel.role_id == RolePermissionModel.role_id)
+        .where(UserRoleModel.user_id == user.id)
+    )
+    role_permissions = set(result.scalars())
+
+    if user.organization_id is None:
+        return set()
+
+    result = await session.execute(
+        select(OrganizationPermissionModel.permission)
+        .where(OrganizationPermissionModel.organization_id == user.organization_id)
+        .where(OrganizationPermissionModel.allowed.is_(True))
+    )
+    org_permissions = set(result.scalars())
+
+    return role_permissions & org_permissions
+
+
+async def get_gateway_site(session, gateway_id):
+    result = await session.execute(
+        select(GatewayModel.site_id, SiteModel.organization_id)
+        .join(SiteModel, SiteModel.id == GatewayModel.site_id)
+        .where(GatewayModel.id == gateway_id)
+    )
+    return result.first()
+
+
+async def get_user_sites(session, user):
+    roles = await get_user_roles(session, user.id)
+
+    if "super_admin" in roles:
+        return None
+
+    if "org_admin" in roles and user.organization_id is not None:
+        result = await session.execute(
+            select(SiteModel.id).where(SiteModel.organization_id == user.organization_id)
+        )
+        return set(result.scalars())
+
+    result = await session.execute(
+        select(UserSiteAccessModel.site_id).where(UserSiteAccessModel.user_id == user.id)
+    )
+    return set(result.scalars())
