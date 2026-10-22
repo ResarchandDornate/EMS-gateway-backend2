@@ -3,6 +3,7 @@ from fastapi.responses import JSONResponse
 from redis.asyncio import Redis
 from sqlalchemy import text
 
+from src.auth.router import router as auth_router      # <-- add
 from src.config import get_settings
 from src.database import engine
 from src.logging import configure_logging
@@ -39,6 +40,7 @@ def create_app() -> FastAPI:
             {"status": "ok" if ok else "unavailable", **checks}, status_code=200 if ok else 503
         )
 
+    app.include_router(auth_router)      # <-- add (mounts /api/v1/auth/*)
     return app
 
 
