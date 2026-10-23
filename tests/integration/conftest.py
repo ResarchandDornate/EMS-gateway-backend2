@@ -11,6 +11,7 @@ from src.tenancy.gateways import models as _g  # noqa: F401
 from src.tenancy.bess_units import models as _b  # noqa: F401
 from src.auth import models as _a  # noqa: F401
 from src.rbac import models as _r  # noqa: F401
+from src.signals import models as _sig  # noqa: F401
 from src.auth.otp_provider import MockOtpProvider, get_otp_provider
 from src.database import get_session
 from src.main import app

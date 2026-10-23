@@ -13,6 +13,7 @@ class Settings(BaseSettings):
     influx_org: str
     influx_bucket_raw: str
     influx_bucket_long: str
+    influx_bucket_test: str = "telemetry_test"
     redis_url: str
     jwt_secret: str
 
