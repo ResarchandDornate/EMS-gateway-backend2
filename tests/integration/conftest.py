@@ -1,6 +1,8 @@
+import pytest
 import pytest_asyncio
 from httpx import ASGITransport, AsyncClient
 from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
+from sqlalchemy.engine import make_url
 
 from src.config import get_settings
 from src.models import Base
@@ -12,11 +14,19 @@ from src.tenancy.bess_units import models as _b  # noqa: F401
 from src.auth import models as _a  # noqa: F401
 from src.rbac import models as _r  # noqa: F401
 from src.signals import models as _sig  # noqa: F401
+from src.ingestion import models as _ing  # noqa: F401
 from src.auth.otp_provider import MockOtpProvider, get_otp_provider
 from src.database import get_session
 from src.main import app
 
-TEST_DB_URL = get_settings().database_url.rsplit("/", 1)[0] + "/ems_test"
+TEST_DB_URL = make_url(get_settings().database_url).set(database="ems_test")
+assert TEST_DB_URL.database == "ems_test", f"refusing non-test DB: {TEST_DB_URL.database}"
+
+
+@pytest.fixture
+def test_db_url():
+    """The one test DB URL, reused by the session fixture and the concurrency racers."""
+    return TEST_DB_URL
 
 
 @pytest_asyncio.fixture

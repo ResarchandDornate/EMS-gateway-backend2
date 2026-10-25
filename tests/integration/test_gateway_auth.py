@@ -113,6 +113,7 @@ async def test_me_no_token(client, session):
 
 
 async def test_me_malformed_subject(client, session):
+    
     c, _ = client
     await make_gateway(session)
     now = datetime.now(timezone.utc)
