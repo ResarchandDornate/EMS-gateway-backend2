@@ -4,11 +4,13 @@ Pure ASGI middleware mounted OUTERMOST (wrapping Starlette's ServerErrorMiddlewa
 `asgi_app` in src/main.py) so:
   * X-Request-ID is injected on EVERY response, including framework-generated 500s;
   * exactly one access event is emitted per HTTP request (even when the app raises);
-  * unhandled exceptions are NOT swallowed - they propagate so Starlette/FastAPI's
-    ServerErrorMiddleware and any registered exception handlers run normally and the
-    server still logs/instruments the error.
-The access event carries only request_id + method/path/status/duration; never headers,
-cookies, bodies, or query strings.
+  * unhandled exceptions are NOT swallowed - a single structured `unhandled_exception`
+    event (request_id/method/path/exc_type only) is logged, then the exception is
+    re-raised so Starlette/FastAPI's ServerErrorMiddleware and any registered exception
+    handlers run normally and the server still renders the 500.
+Both the access event and the error event carry only request_id + method/path (+status/
+duration or exc_type); never headers, cookies, bodies, query strings, exception messages,
+args, or tracebacks.
 """
 import re
 import time
@@ -59,10 +61,24 @@ class RequestContextMiddleware:
         # bound_contextvars resets request_id on exit (normal OR exception) -> no leak.
         with structlog.contextvars.bound_contextvars(request_id=request_id):
             try:
-                # Do NOT catch: unhandled exceptions propagate so ServerErrorMiddleware and
-                # any registered handlers run. Its 500 response.start passes through
-                # send_wrapper above, so the header is injected before it re-raises.
+                # Let exceptions propagate so ServerErrorMiddleware and any registered
+                # handlers run; its 500 response.start passes through send_wrapper above,
+                # so the header is injected before it re-raises.
                 await self.app(scope, receive, send_wrapper)
+            except Exception as exc:
+                # One structured, correlated line for a genuinely-unhandled exception.
+                # Fields ONLY: no message/args/traceback/exc_info/headers/cookies/body/query.
+                try:
+                    structlog.get_logger("error").error(
+                        "unhandled_exception",
+                        request_id=request_id,
+                        method=scope.get("method"),
+                        path=scope.get("path"),
+                        exc_type=type(exc).__name__,
+                    )
+                except Exception:
+                    pass  # logging must never replace or suppress the application exception
+                raise
             finally:
                 duration_ms = round((time.perf_counter() - start) * 1000, 2)
                 structlog.get_logger("access").info(

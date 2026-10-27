@@ -104,6 +104,16 @@ async def test_unhandled_exception_framework_500_has_header_and_one_access():
     assert rid and _VALID_ID.fullmatch(rid)
     access = [e for e in logs if e.get("event") == "access"]
     assert len(access) == 1 and access[0]["status"] == 500 and access[0]["request_id"] == rid
+    # exactly one structured, correlated error line - fields ONLY, no message/traceback
+    errs = [e for e in logs if e.get("event") == "unhandled_exception"]
+    assert len(errs) == 1
+    ev = errs[0]
+    assert ev["request_id"] == rid and ev["method"] == "GET" and ev["path"] == "/boom"
+    assert ev["exc_type"] == "RuntimeError"
+    forbidden = {"exc_info", "exception", "exc", "stack", "stack_info", "traceback",
+                 "headers", "cookie", "cookies", "authorization", "query", "query_string", "body"}
+    assert not (set(ev) & forbidden)
+    assert "kaboom" not in repr(ev)                 # no exception message leaks anywhere
     assert "request_id" not in structlog.contextvars.get_contextvars()
 
 
@@ -125,6 +135,8 @@ async def test_registered_exception_handler_is_preserved():
     assert r.headers.get("x-request-id")                            # header injected on its response
     access = [e for e in logs if e.get("event") == "access"]
     assert len(access) == 1 and access[0]["status"] == 418
+    # handler returned a response -> this is NOT an unhandled exception
+    assert [e for e in logs if e.get("event") == "unhandled_exception"] == []
 
 
 # ---- bare-middleware contract: no swallow, single log, header injection ----------
@@ -146,6 +158,8 @@ async def test_bare_inner_raises_propagates_and_logs_once():
             await mw(scope, receive, send)
     access = [e for e in logs if e.get("event") == "access"]
     assert len(access) == 1 and access[0]["status"] == 500
+    errs = [e for e in logs if e.get("event") == "unhandled_exception"]
+    assert len(errs) == 1 and errs[0]["exc_type"] == "RuntimeError" and errs[0]["path"] == "/x"
     assert "request_id" not in structlog.contextvars.get_contextvars()
 
 
@@ -245,3 +259,29 @@ async def test_health_unchanged():
     r = await _get("/health")
     assert r.status_code == 200
     assert r.json() == {"status": "ok", "service": "ems-backend"}
+
+
+async def test_logging_failure_does_not_mask_original_exception(monkeypatch):
+    """A failure inside the error-logging call must not replace or suppress the original
+    application exception (minimal safeguard around the unhandled_exception log)."""
+    class _BoomLogger:
+        def error(self, *a, **k):
+            raise RuntimeError("logger is down")     # break the error-log path
+        def info(self, *a, **k):
+            return None                              # keep the access-log path working
+    monkeypatch.setattr(structlog, "get_logger", lambda *a, **k: _BoomLogger())
+
+    async def boom(scope, receive, send):
+        raise ValueError("original failure")
+    mw = RequestContextMiddleware(boom)
+    scope = {"type": "http", "method": "GET", "path": "/x", "headers": []}
+
+    async def receive():
+        return {"type": "http.request", "body": b"", "more_body": False}
+
+    async def send(_m):
+        return None
+
+    with pytest.raises(ValueError):          # the ORIGINAL exception, not the logger's RuntimeError
+        await mw(scope, receive, send)
+    assert "request_id" not in structlog.contextvars.get_contextvars()
