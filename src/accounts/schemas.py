@@ -1,4 +1,5 @@
 import uuid
+from datetime import datetime
 
 from pydantic import BaseModel, EmailStr, field_validator
 
@@ -95,6 +96,9 @@ class GatewayOut(BaseModel):
     gateway_key: str
     client_id: str
     enabled: bool
+    # Last SUCCESSFUL token issuance (interim liveness); NULL until the gateway first
+    # obtains a token. Not telemetry time; not a live-connectivity guarantee.
+    last_seen_at: datetime | None = None
 
 
 class GatewayCreated(GatewayOut):

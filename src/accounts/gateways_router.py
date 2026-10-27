@@ -49,6 +49,6 @@ async def list_gateways(
     gateways = await service.list_gateways(session, site_id)
     return [
         GatewayOut(id=g.id, site_id=g.site_id, gateway_key=g.gateway_key,
-                   client_id=g.client_id, enabled=g.enabled)
+                   client_id=g.client_id, enabled=g.enabled, last_seen_at=g.last_seen_at)
         for g in gateways
     ]

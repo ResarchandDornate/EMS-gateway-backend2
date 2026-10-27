@@ -18,7 +18,12 @@ async def gateway_token(body: GatewayTokenRequest, session: AsyncSession = Depen
         raise HTTPException(status.HTTP_401_UNAUTHORIZED, "Invalid credentials")
     if not gw.enabled:
         raise HTTPException(status.HTTP_403_FORBIDDEN, "Gateway disabled")
+    # Generate the token FIRST so a token-generation failure cannot persist a heartbeat.
     token = create_gateway_token(gw.id)
+    # interim liveness: record this SUCCESSFUL token issuance (not telemetry, not a
+    # live-connectivity guarantee). Commit the heartbeat in this request's own transaction.
+    await service.mark_gateway_seen(session, gw)
+    await session.commit()
     return GatewayTokenResponse(access_token=token, expires_in=GATEWAY_TOKEN_MINUTES * 60)
 
 

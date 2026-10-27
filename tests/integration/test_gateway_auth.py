@@ -122,3 +122,60 @@ async def test_me_malformed_subject(client, session):
                      get_settings().jwt_secret, algorithm="HS256")
     r = await c.get("/api/v1/gateway/me", headers=bearer(tok))
     assert r.status_code == 401
+
+# ---- O-hygiene: last_seen_at token-issuance heartbeat -------------------------------
+
+async def test_token_success_sets_last_seen_at(client, session):
+    c, _ = client
+    gw, secret = await make_gateway(session)
+    assert gw.last_seen_at is None
+    before = datetime.now(timezone.utc)
+    r = await c.post("/api/v1/gateway/token", json={"client_id": "gw_test", "client_secret": secret})
+    assert r.status_code == 200
+    await session.refresh(gw)
+    assert gw.last_seen_at is not None
+    assert gw.last_seen_at.tzinfo is not None                     # timezone-aware
+    assert before - timedelta(seconds=5) <= gw.last_seen_at <= datetime.now(timezone.utc) + timedelta(seconds=5)
+
+
+async def test_bad_secret_does_not_set_last_seen_at(client, session):
+    c, _ = client
+    gw, _ = await make_gateway(session)
+    r = await c.post("/api/v1/gateway/token", json={"client_id": "gw_test", "client_secret": "wrong"})
+    assert r.status_code == 401
+    await session.refresh(gw)
+    assert gw.last_seen_at is None
+
+
+async def test_unknown_client_does_not_set_last_seen_at(client, session):
+    c, _ = client
+    gw, _ = await make_gateway(session)
+    r = await c.post("/api/v1/gateway/token", json={"client_id": "nope", "client_secret": "x"})
+    assert r.status_code == 401
+    await session.refresh(gw)
+    assert gw.last_seen_at is None
+
+
+async def test_disabled_gateway_does_not_set_last_seen_at(client, session):
+    c, _ = client
+    gw, secret = await make_gateway(session, enabled=False)
+    r = await c.post("/api/v1/gateway/token", json={"client_id": "gw_test", "client_secret": secret})
+    assert r.status_code == 403
+    await session.refresh(gw)
+    assert gw.last_seen_at is None
+
+
+async def test_last_seen_write_rolls_back_with_transaction(session):
+    """Helper-level flush/rollback behavior ONLY: mark_gateway_seen stages the write
+    (set attribute + flush) in the ambient transaction and performs no internal commit,
+    so a rollback discards it. This does NOT independently test the endpoint's
+    transaction (the endpoint's no-heartbeat-on-failure path is covered by the three
+    negative token tests above)."""
+    from src.gateway import service
+    gw, _ = await make_gateway(session)          # committed with last_seen_at NULL
+    assert gw.last_seen_at is None
+    await service.mark_gateway_seen(session, gw)  # set + flush, NOT committed
+    assert gw.last_seen_at is not None            # visible in-session
+    await session.rollback()                      # abort the transaction
+    await session.refresh(gw)                     # reload authoritative row
+    assert gw.last_seen_at is None                # never persisted
