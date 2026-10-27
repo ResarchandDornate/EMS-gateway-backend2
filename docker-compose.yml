@@ -5,8 +5,9 @@ services:
       POSTGRES_USER: ems
       POSTGRES_PASSWORD: ems_dev_password
       POSTGRES_DB: ems
-    ports: ["5434:5432"]
+    ports: ["5436:5432"]
     volumes: [pgdata:/var/lib/postgresql/data]
+
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U ems -d ems"]
       interval: 5s
