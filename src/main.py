@@ -13,6 +13,7 @@ from src.telemetry.router import router as telemetry_router
 from src.config import get_settings
 from src.database import engine
 from src.logging import configure_logging
+from src.middleware import RequestContextMiddleware
 
 
 def create_app() -> FastAPI:
@@ -57,3 +58,8 @@ def create_app() -> FastAPI:
 
 
 app = create_app()
+
+# Served ASGI entrypoint: request-correlation middleware mounted OUTERMOST so it
+# wraps Starlette's ServerErrorMiddleware -> framework-generated 500s still carry
+# X-Request-ID and normal framework exception handling runs. Serve src.main:asgi_app.
+asgi_app = RequestContextMiddleware(app)
