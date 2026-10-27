@@ -2,8 +2,8 @@
 
 Strict isolation: the only writing InfluxGateway here is built from a settings override
 where BOTH influx_bucket_raw and influx_bucket_long equal influx_bucket_test, so T1/T2
-route only to telemetry_test. Real registry retention is NOT falsified; T3 still fails
-closed. Influx tests skip ONLY when ping() shows the server is unreachable.
+route only to telemetry_test. Real registry retention is NOT falsified. (Interim 2026-10-26: T3 now routes to the long bucket,
+which here is also telemetry_test.) Influx tests skip ONLY when ping() shows the server is unreachable.
 """
 import uuid
 from datetime import datetime, timedelta, timezone

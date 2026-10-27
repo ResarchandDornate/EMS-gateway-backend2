@@ -17,6 +17,9 @@ class Settings(BaseSettings):
     redis_url: str
     jwt_secret: str
 
+    # 9b-ii-c live-ingestion gate (default OFF; record contract still PROVISIONAL)
+    ingest_enabled: bool = False
+
     # auth / OTP
     otp_provider: str = "mock"            # "mock" now; "msg91" once the account is live
     msg91_auth_key: str | None = None

@@ -1,0 +1,227 @@
+# UnityESS Central EMS — Northbound Ingestion: Gateway Contract Confirmation
+
+**Status:** Draft for gateway/EMS team confirmation
+**Prepared:** 2026-10-25
+**Scope:** `POST /api/v1/gateway/ingest` (Northbound telemetry ingestion, streams S1 & S2)
+**Current state:** The ingestion endpoint is implemented and tested but **disabled by default**
+(`ingest_enabled = false`); it authenticates the gateway and returns **HTTP 503** until the
+items below are confirmed in writing. The record JSON keys and timestamp meaning are
+currently **assumptions** and must be confirmed before live ingestion is enabled.
+
+This document separates **what the backend currently assumes (verified from our source)**
+from **what we need the gateway/EMS team to confirm**. Please complete the Approval Record
+at the end.
+
+---
+
+## How the endpoint works today (source-verified)
+
+- **Transport:** HTTP POST with a JSON body. `Content-Encoding: gzip` or `identity` is
+  accepted. Limits enforced: compressed body ≤ 5 MiB, decompressed ≤ 50 MiB, and
+  `record_count` ≤ 10,000 records per message.
+- **Message envelope fields currently accepted** (`schema_version = "1.0"`):
+
+  | Field | Type | Notes (verified) |
+  |---|---|---|
+  | `schema_version` | string | Only `"1.0"` accepted today |
+  | `message_id` | UUID | Idempotency key (per gateway) |
+  | `gateway_id` | string | Must match the authenticated gateway's registered identity |
+  | `site_id` | string | Must match the gateway's DB-derived site |
+  | `organization_id` | string | Must match the gateway's DB-derived organization |
+  | `stream` | string | `S1` or `S2` ingested; `S3`–`S9`/`D1` → 501; others → 422 |
+  | `substream` | string | e.g. `bess_fast` (S1), `bms_extended`/`ems_system`/… (S2) |
+  | `sequence` | integer ≥ 0 | |
+  | `created_at_utc` | string | Envelope-level timestamp |
+  | `record_count` | integer | Must equal the number of records |
+  | `records` | array | See B1 |
+  | `compression` | string or null | Optional |
+  | `gateway_software_version` | string or null | Optional |
+
+- **Scope/authorization (verified):** the backend derives `organization → site → gateway`
+  from its own database for the authenticated gateway and **rejects the message with 403 if
+  the envelope's `gateway_id`/`site_id`/`organization_id` do not match**. Client-supplied IDs
+  are never trusted for authorization — they must equal the registered values.
+- **Signal validation (verified):** every record is validated against our canonical signal
+  registry (stream/substream, signal identity, numeric type and range, quality, timestamp).
+  Any invalid record rejects the **whole** message before anything is stored.
+- **Idempotency / retries (verified):** messages are de-duplicated per `(gateway_id,
+  message_id)`. A re-sent, already-stored message with the **same** payload is acknowledged as
+  a duplicate (no re-write); the **same** `message_id` with a **different** payload is rejected
+  with **409**; a message still being processed returns **409**. A write that fails after the
+  message is claimed leaves it retryable (it is **not** acknowledged as stored).
+
+
+---
+
+## Target gateway, scope & cadence (CONFIRM cadence)
+
+**Target gateway:** this contract covers the **Kalpa S2 northbound gateway**. The authoritative
+Kalpa signal definitions available in this repository are the seeded signal registry
+(`src/signals/seed/signal_registry.csv`, `source = kalpa`); the original Kalpa workbook is **not**
+present in the repo, so the cadences below are taken from the **registry only**.
+
+**Current implementation scope (source-verified):** ingestion accepts **S1 and S2 only**.
+Streams `S3`-`S9`/`D1` are recognized but **not yet supported** (-> HTTP 501); any other stream -> 422.
+
+**Proposed per-substream cadence (registry-derived - TARGET, pending gateway confirmation):**
+
+| Stream / substream | Signals | Cadence(s) in registry (seconds) | Retention |
+|---|---|---|---|
+| S1 / `bess_fast` | 63 | 1 | T1_RAW_90D |
+| S2 / `bms_extended` | 2255 | 30 / 60 / 120 / 180 / 300 / 600 | T2_1Y (6 signals T3_3Y) |
+| S2 / `pcs_extended` | 86 | 15 / 60 / 21600 | T2_1Y |
+| S2 / `ems_system` | 45 | 30 / 120 / 1800 | T2_1Y (6 signals T3_3Y) |
+| S2 / `liquid_cooling` | 26 | 30 / 60 / 120 | T2_1Y |
+| S2 / `remote_control` | 26 | 600 | T2_1Y |
+| S2 / `io_module` | 17 | 60 / 120 | T2_1Y |
+| S2 / `dehumidifier` | 9 | 60 / 300 | T2_1Y |
+| S2 / `fire_protection` | 7 | 60 | T2_1Y |
+
+These cadences are the backend's **proposed target** and **require gateway-team confirmation**
+(or a corrected cadence table). The gateway team has **not** approved them.
+
+**Utility-meter note:** the Kalpa S2 registry contains **no utility-meter / revenue-meter signals**
+(none found). S2 utility-meter forwarding was **not represented** in the supplied workload benchmark.
+If utility-meter data is in scope for this gateway, it must be defined and added to this contract separately.
+
+---
+
+## B1 — Record JSON contract (CONFIRM)
+
+**Backend currently assumes each record has these keys** (marked *provisional* in our source):
+
+| Key | Type assumed | Required? | Notes |
+|---|---|---|---|
+| `source_id` | string (≤128) | required | Tag; identifies the data source |
+| `asset_id` | string (≤128) | required | Tag; identifies the asset (e.g. rack/bank/PCS) |
+| `signal_key` | string (≤128) | required | Must exist in the registry for that substream |
+| `value` | number (float/int) | required (non-null) | Schema accepts number/string/bool/null, but the backend **coerces to the registry's numeric type and rejects (HTTP 422) any non-numeric or null value** for all current signals. See B1 Q3. |
+| `quality` | string or null (≤32) | optional | Backend accepts only `good`/`stale`/`offline`/`error` (case-insensitive) or null; any other value is rejected (HTTP 422). See B1 Q5. |
+| `timestamp` | string | required | See B2 |
+
+**Please confirm or correct:**
+1. The exact literal key names above (any renames, casing, or additional keys we must accept/ignore?).
+2. A **representative real JSON envelope + records** example (one S1 `bess_fast` and one S2
+   `bms_extended` message), including field types, which fields are required vs optional, and
+   nullability.
+3. `value` encoding: **the backend currently rejects (HTTP 422) any non-numeric or null
+   value**, because every signal in the registry is numeric. Please confirm whether any
+   signals — especially **state / status / enumerated / alarm** signals — are sent as strings,
+   booleans, or null. If so, we must agree on an encoding (e.g. numeric codes) before enabling
+   ingestion; we will not silently narrow or widen the contract.
+4. That the `gateway_id`/`site_id`/`organization_id` the gateway will send are the registered
+   UUIDs (so the 403 scope check passes).
+5. `quality` values: the backend accepts only `good`/`stale`/`offline`/`error` (or null).
+   Please confirm the exact quality/status values the gateway emits and how they map to these.
+
+---
+
+## B2 — Timestamp semantics (CONFIRM)
+
+**Backend currently (verified):** each record `timestamp` is parsed as **ISO-8601 and must
+include a UTC offset** (naive timestamps are rejected); invalid calendar dates/offsets are
+rejected; the instant is normalized to UTC and used as the **measurement time of the stored
+point**. The envelope's `created_at_utc` is a separate field (currently used only in the
+message idempotency hash, not as the point time).
+
+**Please confirm:**
+1. Does each record `timestamp` represent the **actual measurement instant** (not gateway
+   send/collection time)? If different fields exist for measurement vs transmission time,
+   which should be the stored point time?
+2. Format: ISO-8601 with offset (e.g. `2026-09-04T07:59:14+05:30`) — or epoch
+   (seconds/milliseconds)? If epoch, specify unit and timezone rules.
+3. Precision (seconds / milliseconds / microseconds) and timezone handling (always UTC? local
+   with offset?).
+4. How are **missing**, **delayed**, or **out-of-order** measurements represented and expected
+   to be handled?
+
+---
+
+## T3 — Long-retention (3-year) signals (CONFIRM)
+
+Our registry classifies these **12** signals as `T3_3Y`. There is **no 3-year retention
+bucket configured** today — only two buckets exist: `telemetry_raw_90d` (S1) and `telemetry_1y`
+(S2). Their **90-day / 365-day durations are development/configuration values** (from
+`docker-compose.yml`) and are **not an independently verified production retention guarantee**;
+the deployed InfluxDB instance's actual retention policies must be verified separately. These
+12 signals therefore **fail closed**: a message containing any of them is currently rejected
+with **HTTP 501** and nothing is stored. We will **not** invent a bucket or reroute them.
+
+| # | Stream/Substream | `signal_key` | asset_type | type | unit |
+|---|---|---|---|---|---|
+| 1 | S2/ems_system | `system_charge_energy_session` | bank | FLOAT32 | kWh |
+| 2 | S2/ems_system | `system_discharge_energy_session` | bank | FLOAT32 | kWh |
+| 3 | S2/ems_system | `system_full_charge_capacity` | bank | FLOAT32 | kWh |
+| 4 | S2/ems_system | `system_full_discharge_capacity` | bank | FLOAT32 | kWh |
+| 5 | S2/ems_system | `system_accumulated_charge_energy` | bank | FLOAT32 | kWh |
+| 6 | S2/ems_system | `system_accumulated_discharge_energy` | bank | FLOAT32 | kWh |
+| 7 | S2/bms_extended | `rack_charge_energy_session` | rack | FLOAT32 | kWh |
+| 8 | S2/bms_extended | `rack_discharge_energy_session` | rack | FLOAT32 | kWh |
+| 9 | S2/bms_extended | `rack_full_charge_capacity` | rack | FLOAT32 | kWh |
+| 10 | S2/bms_extended | `rack_full_discharge_capacity` | rack | FLOAT32 | kWh |
+| 11 | S2/bms_extended | `rack_accumulated_charge_energy` | rack | FLOAT32 | kWh |
+| 12 | S2/bms_extended | `rack_accumulated_discharge_energy` | rack | FLOAT32 | kWh |
+
+**Please confirm ONE of:**
+- (a) The intended **3-year retention bucket/policy** for these signals and **when** the
+  gateway will start transmitting them; or
+- (b) That gateways will **not** send these 12 signals in current S1/S2 batches until a
+  retention policy is approved (so they do not trigger 501 rejections).
+
+---
+
+## SoC — Authoritative State-of-Charge mappings (CONFIRM)
+
+Overall-BESS SoC and per-rack SoC are **currently unresolved** in our source (both mappings
+are explicitly unset; we do not guess, duplicate across racks, or average rack values to
+fabricate an overall figure). Note: an S1 `bess_fast` signal named `soc` exists (asset_type
+`pcs_1`), but it has **not** been confirmed as the authoritative overall-BESS or per-rack SoC.
+The only SoC signals in the S2 `ems_system` substream are `system_max_rack_soc` and
+`system_min_rack_soc` (bank, %, T2_1Y) — **neither is an authoritative overall-BESS SoC**, and
+the registry contains **no whole-rack SoC** signal (rack level has only cell-level and max/min
+aggregates).
+
+**Please confirm:**
+1. The **exact source signal identifier(s)** for **overall-BESS SoC** and for **per-rack SoC**
+   (stream, substream, `signal_key`, `source_id`/`asset_id` scope).
+2. **Units** and value range (e.g. % 0–100).
+3. **Aggregation semantics** for overall SoC — is it a single reported signal, or must it be
+   derived? If derived, the exact method (we will not average rack SoC to invent it without a
+   documented rule).
+
+---
+
+## Rate limiting (CONFIRM operational requirements)
+
+No rate limiting is implemented yet on `POST /api/v1/gateway/token` or
+`POST /api/v1/gateway/ingest`. To design it from real requirements, please provide:
+1. Expected **token** request rate per gateway (and token lifetime/refresh behavior).
+2. Expected **ingest** request rate and message size per gateway (steady-state and peak).
+3. **Burst** limits and expected **retry/backoff** behavior on 429/503 (so retries interact
+   correctly with our idempotency ledger).
+4. **Acknowledgement handling:** how the gateway treats each ingest response — success (200
+   stored), duplicate (200 already-stored), validation failure (422), and retryable failure
+   (409/503) — including which responses it treats as final vs. retryable.
+5. **Outage backlog recovery:** how queued messages are replayed once connectivity returns —
+   expected replay rate/burst, ordering guarantees (in-order vs. out-of-order), and
+   retry/backoff schedule — so replays interact correctly with the idempotency ledger.
+
+---
+
+## Approval Record
+
+Please mark each item and return to the EMS backend team.
+
+| Item | Confirmed / Rejected / Pending | Notes / corrections |
+|---|---|---|
+| B1 — Record JSON contract + example | | |
+| B2 — Timestamp semantics | | |
+| T3 — 3-year retention decision | | |
+| SoC — authoritative mappings | | |
+| Rate limiting — operational rates | | |
+
+**Responsible contact (gateway/EMS team):** ______________________
+**Confirmation date:** ______________________
+
+> Until B1 and B2 are confirmed, ingestion remains gated OFF. T3 signals remain fail-closed
+> until a retention policy is approved. SoC remains unresolved and will not be fabricated.

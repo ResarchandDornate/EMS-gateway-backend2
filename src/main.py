@@ -9,6 +9,7 @@ from src.auth.router import router as auth_router
 from src.accounts.operators_router import router as operators_router
 from src.gateway.router import router as gateway_router
 from src.ingestion.router import router as ingest_router
+from src.telemetry.router import router as telemetry_router
 from src.config import get_settings
 from src.database import engine
 from src.logging import configure_logging
@@ -51,6 +52,7 @@ def create_app() -> FastAPI:
     app.include_router(gateways_router)  # mounts /api/v1/admin/sites/{site_id}/gateways
     app.include_router(gateway_router)   # mounts /api/v1/gateway/*
     app.include_router(ingest_router)    # mounts /api/v1/gateway/ingest (503 until 9b-ii)
+    app.include_router(telemetry_router) # mounts /api/v1/telemetry/* (read-only; ungated)
     return app
 
 

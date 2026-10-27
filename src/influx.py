@@ -13,7 +13,6 @@ from src.signals.types import QUALITY_SUFFIX, coerce, validate_quality
 from src.telemetry_errors import (
     InvalidTimestamp,
     RegistryConflict,
-    RetentionNotConfigured,
     SignalMismatch,
     UnknownRetentionClass,
     UnknownSignal,
@@ -28,6 +27,7 @@ _REQUIRED = ("measurement",) + TAG_KEYS + ("signal_key",)
 
 _IDENT = re.compile(r"^[A-Za-z0-9_.:\-]+$")
 _RANGE = re.compile(r"^-?\d+(ns|us|ms|s|m|h|d|w|mo|y)$")
+_AGG_FLUX_FNS = frozenset({"mean", "min", "max", "first", "last", "count"})
 
 
 def measurement_for(stream: str, substream: str) -> str:
@@ -36,13 +36,19 @@ def measurement_for(stream: str, substream: str) -> str:
 
 def bucket_for(retention_class: str, settings) -> str:
     """Code-level routing only (NOT the actual Influx retention policy, which must be
-    verified in InfluxDB). T1->raw, T2->long. T3 and unknown fail closed."""
+    verified in InfluxDB). T1->raw, T2->long. Unknown classes fail closed.
+
+    INTERIM (decision 2026-10-26): no dedicated 3-year bucket is provisioned yet, so
+    T3_3Y is routed TEMPORARILY to the configured 1-year (long) bucket. This is NOT
+    three-year retention; data may be purged at the long bucket's retention window.
+    When a dedicated 3-year bucket/policy is provisioned, change this T3_3Y branch to
+    return that bucket. The registry keeps the T3_3Y classification unchanged."""
     if retention_class == "T1_RAW_90D":
         return settings.influx_bucket_raw
     if retention_class == "T2_1Y":
         return settings.influx_bucket_long
     if retention_class == "T3_3Y":
-        raise RetentionNotConfigured("T3_3Y has no Influx bucket/policy configured yet")
+        return settings.influx_bucket_long   # INTERIM 2026-10-26: see docstring; migrate later
     raise UnknownRetentionClass(f"Unknown retention class: {retention_class!r}")
 
 
@@ -189,6 +195,10 @@ class InfluxGateway:
     def _client(self) -> InfluxDBClientAsync:
         return InfluxDBClientAsync(url=self._url, token=self._token, org=self._org)
 
+    @property
+    def settings(self):
+        return self._settings
+
     async def health(self) -> bool:
         async with self._client() as c:
             return await c.ping()
@@ -200,6 +210,22 @@ class InfluxGateway:
         by_bucket: dict[str, list] = defaultdict(list)
         for p in points:
             bucket, pt = build_point(index, p, self._settings)
+            by_bucket[bucket].append(pt)
+        async with self._client() as c:
+            wapi = c.write_api()
+            for bucket, recs in by_bucket.items():
+                await wapi.write(bucket=bucket, record=recs)
+
+    async def write_built(self, built) -> None:
+        """Write pre-built (bucket, Point) tuples (from build_message_points) without
+        rebuilding. Destinations are restricted to THIS gateway's configured retention
+        buckets; a tuple naming any other bucket is refused (never writes to an arbitrary
+        non-configured bucket)."""
+        allowed = {self._settings.influx_bucket_raw, self._settings.influx_bucket_long}
+        by_bucket: dict[str, list] = defaultdict(list)
+        for bucket, pt in built:
+            if bucket not in allowed:
+                raise UnsafeQueryInput(f"refusing write to non-configured bucket: {bucket!r}")
             by_bucket[bucket].append(pt)
         async with self._client() as c:
             wapi = c.write_api()
@@ -238,6 +264,54 @@ class InfluxGateway:
             f'and r.site_id == "{site_id}" and r._field == "{signal_key}")\n'
             f'  |> group(columns: ["asset_id", "source_id"])\n'
             f'  |> last()'
+        )
+        return await self.query(flux)
+
+    async def series(self, bucket, measurement, site_id, signal_key, start, stop,
+                     asset_id=None, source_id=None, limit=1000):
+        """Bounded, site-scoped time-series read. All identifiers/ranges are guarded;
+        never queries without site_id. The caller enforces window + limit caps; this
+        method also refuses a non-positive limit. Points are time-sorted ascending."""
+        _ident("bucket", bucket); _ident("measurement", measurement); _ident("site_id", site_id)
+        _ident("signal_key", signal_key); _range(start); _range(stop)
+        if not isinstance(limit, int) or limit < 1:
+            raise UnsafeQueryInput(f"invalid limit: {limit!r}")
+        extra = ""
+        if asset_id:
+            extra += f' and r.asset_id == "{_ident("asset_id", asset_id)}"'
+        if source_id:
+            extra += f' and r.source_id == "{_ident("source_id", source_id)}"'
+        flux = (
+            f'from(bucket: "{bucket}")\n'
+            f'  |> range(start: {start}, stop: {stop})\n'
+            f'  |> filter(fn: (r) => r._measurement == "{measurement}" '
+            f'and r.site_id == "{site_id}" and r._field == "{signal_key}"{extra})\n'
+            f'  |> sort(columns: ["_time"])\n'
+            f'  |> limit(n: {int(limit)})'
+        )
+        return await self.query(flux)
+
+    async def aggregate(self, bucket, measurement, site_id, signal_key,
+                        start, stop, every, flux_fn, asset_id, source_id=None):
+        """Bounded, site-scoped, time-bucketed read. SPARSE: createEmpty is false, so
+        only windows containing data are returned (missing timestamps = gaps, not zero).
+        The caller validates window/fn/bucket-count and maps fn to a fixed Flux name; this
+        method guards every identifier and never queries without site_id. Bucket timestamp
+        = window start."""
+        _ident("bucket", bucket); _ident("measurement", measurement); _ident("site_id", site_id)
+        _ident("signal_key", signal_key); _range(start); _range(stop); _range(every)
+        if flux_fn not in _AGG_FLUX_FNS:
+            raise UnsafeQueryInput(f"unsupported aggregate function: {flux_fn!r}")
+        extra = f' and r.asset_id == "{_ident("asset_id", asset_id)}"'
+        if source_id:
+            extra += f' and r.source_id == "{_ident("source_id", source_id)}"'
+        flux = (
+            f'from(bucket: "{bucket}")\n'
+            f'  |> range(start: {start}, stop: {stop})\n'
+            f'  |> filter(fn: (r) => r._measurement == "{measurement}" '
+            f'and r.site_id == "{site_id}" and r._field == "{signal_key}"{extra})\n'
+            f'  |> aggregateWindow(every: {every}, fn: {flux_fn}, createEmpty: false, timeSrc: "_start")\n'
+            f'  |> sort(columns: ["_time"])'
         )
         return await self.query(flux)
 

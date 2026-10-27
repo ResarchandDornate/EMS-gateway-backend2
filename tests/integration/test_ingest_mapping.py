@@ -11,7 +11,7 @@ from src.influx import (RegistryIndex, TelemetryPoint, build_point, measurement_
 from src.ingestion.mapping import build_message_points
 from src.ingestion.schemas import EnvelopeIn
 from src.telemetry_errors import (
-    InvalidTimestamp, InvalidValue, RetentionNotConfigured, SignalMismatch,
+    InvalidTimestamp, InvalidValue, SignalMismatch,
     UnknownSignal, UnsafeQueryInput,
 )
 
@@ -130,18 +130,22 @@ def test_identity_validation_rejects_bad_ids():
         _build("S2", "bms_extended", [_rec("rack_operating_state", 5, asset_id="a/b")])
 
 
-# --------------------------------- T3 fail-closed ----------------------------------
-def test_t3_fail_closed_single():
-    with pytest.raises(RetentionNotConfigured):
-        _build("S2", "bms_extended", [_rec("rack_charge_energy_session", 1.0)])
+# --------------------------------- T3 interim routing (-> long) ----------------------------------
+def test_t3_interim_routes_to_long():
+    # INTERIM 2026-10-26: T3 builds and routes to the long (1-year) bucket.
+    built = _build("S2", "bms_extended", [_rec("rack_charge_energy_session", 1.0)])
+    assert len(built) == 1 and built[0][0] == SETTINGS.influx_bucket_long
 
 
-def test_t3_fail_closed_rejects_whole_message():
-    with pytest.raises(RetentionNotConfigured):
-        _build("S2", "bms_extended", [
-            _rec("rack_operating_state", 5),            # valid T2
-            _rec("rack_charge_energy_session", 1.0),    # T3 -> whole message rejected
-        ])
+def test_t3_interim_mixed_message_all_route_to_long():
+    # INTERIM 2026-10-26: T2 and T3 records both build; T3 routes to the long bucket.
+    built = _build("S2", "bms_extended", [
+        _rec("rack_operating_state", 5),            # T2
+        _rec("rack_charge_energy_session", 1.0),    # T3 -> interim long
+    ])
+    assert len(built) == 2
+    assert built[0][0] == SETTINGS.influx_bucket_long
+    assert built[1][0] == SETTINGS.influx_bucket_long
 
 
 # ------------------- multiple signals sharing a timestamp: no overwrite -------------------
@@ -194,13 +198,12 @@ def test_real_seed_builds_and_routes():
                          (r["data_type"] or "").strip(), (r["retention_class"] or "").strip()))
     idx = RegistryIndex.from_rows(rows)          # raises RegistryConflict if the seed had dupes
     assert len(idx) == 2534
-    # S1 -> raw, S2 T2 -> long, real T3 -> fail closed
+    # S1 -> raw, S2 T2 -> long, real T3 -> long (INTERIM 2026-10-26)
     from src.ingestion.mapping import build_message_points
     id2 = {"organization_id": "org1", "site_id": "site1", "gateway_id": "gw1"}
     assert build_message_points(_env("S1", "bess_fast", [_rec("soc", 50.0, asset_id="pcs1")]),
                                 id2, idx, SETTINGS)[0][0] == "telemetry_raw_90d"
     assert build_message_points(_env("S2", "bms_extended", [_rec("rack_operating_state", 5)]),
                                 id2, idx, SETTINGS)[0][0] == "telemetry_1y"
-    with pytest.raises(RetentionNotConfigured):
-        build_message_points(_env("S2", "bms_extended", [_rec("rack_charge_energy_session", 1.0)]),
-                             id2, idx, SETTINGS)
+    assert build_message_points(_env("S2", "bms_extended", [_rec("rack_charge_energy_session", 1.0)]),
+                                id2, idx, SETTINGS)[0][0] == "telemetry_1y"

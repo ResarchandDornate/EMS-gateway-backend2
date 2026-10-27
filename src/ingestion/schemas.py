@@ -56,3 +56,9 @@ class EnvelopeIn(BaseModel):
         if self.record_count != len(self.records):
             raise ValueError("record_count does not match number of records")
         return self
+
+
+class IngestAck(BaseModel):
+    status: str            # "stored" | "duplicate"
+    message_id: uuid.UUID
+    record_count: int

@@ -13,7 +13,7 @@ from src.signals.service import (load_registry_index, load_seed,
 from src.signals.soc import resolve_overall_soc, resolve_rack_soc
 from src.signals.types import coerce, field_type, quality_collisions, validate_quality
 from src.telemetry_errors import (InvalidTimestamp, InvalidValue, RegistryConflict,
-                                  RetentionNotConfigured, SignalMismatch,
+                                  SignalMismatch,
                                   UnknownRetentionClass, UnknownSignal,
                                   UnresolvedMetadata, UnsafeQueryInput, UnsupportedDataType)
 
@@ -39,8 +39,9 @@ def test_bucket_t1_t2():
     assert bucket_for("T1_RAW_90D", _SETTINGS) == _SETTINGS.influx_bucket_raw
     assert bucket_for("T2_1Y", _SETTINGS) == _SETTINGS.influx_bucket_long
 
-def test_bucket_t3_rejected():
-    with pytest.raises(RetentionNotConfigured): bucket_for("T3_3Y", _SETTINGS)
+def test_bucket_t3_interim_routes_to_long():
+    # INTERIM 2026-10-26: T3_3Y temporarily routes to the configured long (1-year) bucket.
+    assert bucket_for("T3_3Y", _SETTINGS) == _SETTINGS.influx_bucket_long
 
 def test_bucket_unknown_rejected():
     with pytest.raises(UnknownRetentionClass): bucket_for("T9_X", _SETTINGS)
@@ -117,10 +118,11 @@ def test_asset_type_required_from_registry():
         build_point(_IDX_NO_ASSET, _pt("s", "a", "src", "sig_no_asset", 1, ts,
                                        meas="s2_x", substream="x"), _SETTINGS)
 
-def test_retention_t3_rejected_in_write_path():
+def test_retention_t3_interim_builds_to_long():
+    # INTERIM 2026-10-26: T3 builds a point routed to the long (1-year) bucket, not rejected.
     ts = datetime.now(timezone.utc)
-    with pytest.raises(RetentionNotConfigured):
-        build_point(_IDX, _pt("s", "r1", "src", "rack_energy", 10.0, ts), _SETTINGS)
+    bucket, _built = build_point(_IDX, _pt("s", "r1", "src", "rack_energy", 10.0, ts), _SETTINGS)
+    assert bucket == _SETTINGS.influx_bucket_long
 
 def test_registry_type_enforced():
     ts = datetime.now(timezone.utc)
@@ -279,10 +281,10 @@ async def test_batch_all_or_nothing(influx_test):
     gw, bucket = influx_test
     site = f"pytest-{uuid.uuid4().hex[:8]}"; now = datetime.now(timezone.utc)
     try:
-        with pytest.raises(RetentionNotConfigured):
+        with pytest.raises(UnknownSignal):
             await gw.write([
-                _pt(site, "bms_rack_1", "external_ems_1", "rack_voltage", 700.0, now),   # valid
-                _pt(site, "bms_rack_1", "external_ems_1", "rack_energy", 5.0, now),       # T3 -> fails closed
+                _pt(site, "bms_rack_1", "external_ems_1", "rack_voltage", 700.0, now),     # valid
+                _pt(site, "bms_rack_1", "external_ems_1", "rack_unknown_sig", 5.0, now),   # invalid -> fails closed
             ], _IDX)
         res = rows(await gw.latest_by_asset(bucket, "s2_bms_extended", site, "rack_voltage"))
         assert res == []     # nothing written because build happens before any I/O
