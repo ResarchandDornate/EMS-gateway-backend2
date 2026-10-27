@@ -1,11 +1,21 @@
 import uuid
 
-from pydantic import BaseModel, EmailStr
+from pydantic import BaseModel, EmailStr, field_validator
 
 
 class SiteIn(BaseModel):
     site_key: str
     name: str
+
+    @field_validator("site_key")
+    @classmethod
+    def _norm_site_key(cls, v: str) -> str:
+        return v.strip().lower()          # trim + lowercase (identity)
+
+    @field_validator("name")
+    @classmethod
+    def _norm_site_name(cls, v: str) -> str:
+        return v.strip()                  # display label: trim only
 
 
 class OrganizationCreate(BaseModel):
@@ -14,6 +24,16 @@ class OrganizationCreate(BaseModel):
     admin_phone: str
     admin_email: EmailStr | None = None
     sites: list[SiteIn] = []
+
+    @field_validator("org_key")
+    @classmethod
+    def _norm_org_key(cls, v: str) -> str:
+        return v.strip().lower()          # trim + lowercase (identity)
+
+    @field_validator("name")
+    @classmethod
+    def _norm_org_name(cls, v: str) -> str:
+        return v.strip()                  # display label: trim only
 
 
 class SiteOut(BaseModel):
@@ -44,6 +64,7 @@ class OrganizationDetail(BaseModel):
     sites: list[SiteOut]
     operators: list[OperatorOut]
 
+
 class OperatorCreate(BaseModel):
     phone: str
     email: EmailStr | None = None
@@ -57,9 +78,15 @@ class OperatorDetail(BaseModel):
     is_active: bool
     site_ids: list[uuid.UUID]
 
+
 class GatewayCreate(BaseModel):
     gateway_key: str
     software_version: str | None = None
+
+    @field_validator("gateway_key")
+    @classmethod
+    def _norm_gateway_key(cls, v: str) -> str:
+        return v.strip()                  # trim ONLY - case preserved (external id)
 
 
 class GatewayOut(BaseModel):
@@ -71,4 +98,4 @@ class GatewayOut(BaseModel):
 
 
 class GatewayCreated(GatewayOut):
-    client_secret: str   # returned ONCE, at registration    
+    client_secret: str   # returned ONCE, at registration
