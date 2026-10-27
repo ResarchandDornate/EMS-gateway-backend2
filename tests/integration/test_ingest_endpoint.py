@@ -75,7 +75,8 @@ class _StubInflux:
     fails writes. Used for deterministic PG-only state/failure tests (no Influx server)."""
     def __init__(self, fail_write=False):
         self._s = _types.SimpleNamespace(influx_bucket_raw="telemetry_test",
-                                         influx_bucket_long="telemetry_test")
+                                         influx_bucket_long="telemetry_test",
+                                         influx_bucket_3y="telemetry_test")
         self.fail_write = fail_write
         self.writes = []
 
@@ -113,7 +114,8 @@ def real_influx():
         if b.find_bucket_by_name(base.influx_bucket_test) is None:
             b.create_bucket(bucket_name=base.influx_bucket_test, org=base.influx_org)
         ts = base.model_copy(update={"influx_bucket_raw": base.influx_bucket_test,
-                                     "influx_bucket_long": base.influx_bucket_test})
+                                     "influx_bucket_long": base.influx_bucket_test,
+                                     "influx_bucket_3y": base.influx_bucket_test})
         gw = InfluxGateway(settings=ts)
         assert gw.settings.influx_bucket_raw == base.influx_bucket_test
         assert gw.settings.influx_bucket_long == base.influx_bucket_test
@@ -286,14 +288,15 @@ async def test_invalid_telemetry_422_no_claim(client, session, enabled):
     assert await _count(session) == 0 and stub.writes == []
 
 
-async def test_t3_interim_stored_200(client, session, enabled):
-    # INTERIM 2026-10-26: a T3 signal no longer 501s; it is claimed and written to the
-    # configured LONG (1-year) bucket, NOT raw. Distinct stub bucket names make long-vs-raw
-    # routing unambiguous. Unrelated validation/auth/idempotency behavior is unchanged.
+async def test_t3_stored_200(client, session, enabled):
+    # A T3 signal no longer 501s; it is claimed and written to the configured 3-year bucket,
+    # NOT raw or long. Distinct stub bucket names make routing unambiguous. Unrelated
+    # validation/auth/idempotency behavior is unchanged.
     c, _ = client; app = enabled
     stub = _StubInflux()
     stub.settings.influx_bucket_raw = "telemetry_raw_test"
     stub.settings.influx_bucket_long = "telemetry_long_test"
+    stub.settings.influx_bucket_3y = "telemetry_3y_test"
     app.dependency_overrides[get_influx_gateway] = lambda: stub
     org, site, gw = await _mk(session, o="o1", s="s1", g="g1", c="c1")
     env = _env(org, site, gw, records=[_rec("rack_charge_energy_session", 1.0)])
@@ -303,8 +306,8 @@ async def test_t3_interim_stored_200(client, session, enabled):
     assert body["status"] == "stored" and body["record_count"] == 1
     assert await _count(session) == 1
     assert len(stub.writes) == 1
-    assert stub.writes[0][0][0] == "telemetry_long_test"
-    assert stub.writes[0][0][0] != "telemetry_raw_test"
+    assert stub.writes[0][0][0] == "telemetry_3y_test"
+    assert stub.writes[0][0][0] not in ("telemetry_raw_test", "telemetry_long_test")
 
 
 async def test_malformed_json_400(client, session, enabled):

@@ -43,7 +43,8 @@ def _reset():
 class _StubRead:
     def __init__(self, *, fail=False, no_call=False):
         self._s = types.SimpleNamespace(influx_bucket_raw="telemetry_test",
-                                        influx_bucket_long="telemetry_test")
+                                        influx_bucket_long="telemetry_test",
+                                        influx_bucket_3y="telemetry_test")
         self.fail = fail; self.no_call = no_call
         self.calls = []            # records (method, args, kwargs) so reads can be asserted
 
@@ -221,14 +222,15 @@ async def test_unsupported_stream_422(client, session):
     assert r.status_code == 422
 
 
-async def test_t3_signal_interim_reads_200(client, session):
-    # INTERIM 2026-10-26: T3 resolves to the LONG bucket, so reads succeed (200) not 501.
-    # Distinct stub bucket names prove long-vs-raw; the authorized site is forwarded to the
+async def test_t3_signal_reads_200(client, session):
+    # T3 resolves to the dedicated 3-year bucket, so reads succeed (200) not 501. Distinct
+    # stub bucket names prove 3y-vs-raw-vs-long; the authorized site is forwarded to the
     # reader. (The actual Flux site filter is covered by the real-influx read tests.)
     c, _ = client
     stub = _StubRead()
     stub.settings.influx_bucket_raw = "telemetry_raw_test"
     stub.settings.influx_bucket_long = "telemetry_long_test"
+    stub.settings.influx_bucket_3y = "telemetry_3y_test"
     _override(stub)
     await _rbac(session)
     org = await _org(session, "o1"); site = await _site(session, org, "A")
@@ -238,8 +240,8 @@ async def test_t3_signal_interim_reads_200(client, session):
     assert r.status_code == 200
     assert stub.calls and stub.calls[-1][0] == "latest_by_asset"
     bucket, _measurement, called_site, signal_key = stub.calls[-1][1]
-    assert bucket == "telemetry_long_test"
-    assert bucket != "telemetry_raw_test"
+    assert bucket == "telemetry_3y_test"
+    assert bucket not in ("telemetry_raw_test", "telemetry_long_test")
     assert called_site == str(site.id)
     assert signal_key == "rack_charge_energy_session"
 
@@ -325,7 +327,8 @@ def real_influx():
         if b.find_bucket_by_name(base.influx_bucket_test) is None:
             b.create_bucket(bucket_name=base.influx_bucket_test, org=base.influx_org)
         ts = base.model_copy(update={"influx_bucket_raw": base.influx_bucket_test,
-                                     "influx_bucket_long": base.influx_bucket_test})
+                                     "influx_bucket_long": base.influx_bucket_test,
+                                     "influx_bucket_3y": base.influx_bucket_test})
         gw = InfluxGateway(settings=ts)
         assert gw.settings.influx_bucket_raw == base.influx_bucket_test
         assert gw.settings.influx_bucket_long == base.influx_bucket_test
@@ -540,11 +543,12 @@ async def test_aggregate_org_admin_own_200_cross_403(client, session):
     assert (await c.get(AGGREGATE, params=_ap(s2.id), headers=_auth(admin1))).status_code == 403
 
 
-async def test_aggregate_t3_routes_to_long_bucket(client, session):
+async def test_aggregate_t3_routes_to_3y_bucket(client, session):
     c, _ = client
     stub = _StubRead()
     stub.settings.influx_bucket_raw = "telemetry_raw_test"
     stub.settings.influx_bucket_long = "telemetry_long_test"
+    stub.settings.influx_bucket_3y = "telemetry_3y_test"
     _override(stub)
     await _rbac(session)
     org = await _org(session, "o1"); site = await _site(session, org, "A")
@@ -554,8 +558,8 @@ async def test_aggregate_t3_routes_to_long_bucket(client, session):
     assert r.status_code == 200
     assert stub.calls and stub.calls[-1][0] == "aggregate"
     bucket = stub.calls[-1][1][0]
-    assert bucket == "telemetry_long_test"
-    assert bucket != "telemetry_raw_test"
+    assert bucket == "telemetry_3y_test"
+    assert bucket not in ("telemetry_raw_test", "telemetry_long_test")
 
 
 async def test_aggregate_all_functions_roundtrip(client, session, real_influx):

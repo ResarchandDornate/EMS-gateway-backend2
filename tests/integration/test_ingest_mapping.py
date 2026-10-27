@@ -19,6 +19,7 @@ from src.telemetry_errors import (
 SETTINGS = types.SimpleNamespace(
     influx_bucket_raw="telemetry_raw_90d",
     influx_bucket_long="telemetry_1y",
+    influx_bucket_3y="telemetry_3y",
 )
 
 # ---- verified-real registry rows (from src/signals/seed/signal_registry.csv) ----
@@ -134,18 +135,18 @@ def test_identity_validation_rejects_bad_ids():
 def test_t3_interim_routes_to_long():
     # INTERIM 2026-10-26: T3 builds and routes to the long (1-year) bucket.
     built = _build("S2", "bms_extended", [_rec("rack_charge_energy_session", 1.0)])
-    assert len(built) == 1 and built[0][0] == SETTINGS.influx_bucket_long
+    assert len(built) == 1 and built[0][0] == SETTINGS.influx_bucket_3y
 
 
 def test_t3_interim_mixed_message_all_route_to_long():
     # INTERIM 2026-10-26: T2 and T3 records both build; T3 routes to the long bucket.
     built = _build("S2", "bms_extended", [
         _rec("rack_operating_state", 5),            # T2
-        _rec("rack_charge_energy_session", 1.0),    # T3 -> interim long
+        _rec("rack_charge_energy_session", 1.0),    # T3 -> 3-year bucket
     ])
     assert len(built) == 2
     assert built[0][0] == SETTINGS.influx_bucket_long
-    assert built[1][0] == SETTINGS.influx_bucket_long
+    assert built[1][0] == SETTINGS.influx_bucket_3y
 
 
 # ------------------- multiple signals sharing a timestamp: no overwrite -------------------
@@ -198,7 +199,7 @@ def test_real_seed_builds_and_routes():
                          (r["data_type"] or "").strip(), (r["retention_class"] or "").strip()))
     idx = RegistryIndex.from_rows(rows)          # raises RegistryConflict if the seed had dupes
     assert len(idx) == 2534
-    # S1 -> raw, S2 T2 -> long, real T3 -> long (INTERIM 2026-10-26)
+    # S1 -> raw, S2 T2 -> long, real T3 -> 3y
     from src.ingestion.mapping import build_message_points
     id2 = {"organization_id": "org1", "site_id": "site1", "gateway_id": "gw1"}
     assert build_message_points(_env("S1", "bess_fast", [_rec("soc", 50.0, asset_id="pcs1")]),
@@ -206,4 +207,4 @@ def test_real_seed_builds_and_routes():
     assert build_message_points(_env("S2", "bms_extended", [_rec("rack_operating_state", 5)]),
                                 id2, idx, SETTINGS)[0][0] == "telemetry_1y"
     assert build_message_points(_env("S2", "bms_extended", [_rec("rack_charge_energy_session", 1.0)]),
-                                id2, idx, SETTINGS)[0][0] == "telemetry_1y"
+                                id2, idx, SETTINGS)[0][0] == "telemetry_3y"

@@ -1,5 +1,6 @@
 from functools import lru_cache
 
+from pydantic import Field, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -14,6 +15,8 @@ class Settings(BaseSettings):
     influx_bucket_raw: str
     influx_bucket_long: str
     influx_bucket_test: str = "telemetry_test"
+    influx_bucket_3y: str = "telemetry_3y"
+    influx_bucket_3y_retention_seconds: int = Field(default=94_608_000, gt=0)  # 1095 d (PROPOSED, not prod-approved)
     redis_url: str
     jwt_secret: str
 
@@ -27,6 +30,14 @@ class Settings(BaseSettings):
     msg91_sms_template_id: str | None = None
     msg91_sender_id: str | None = None
     msg91_email_from: str | None = None
+
+    @field_validator("influx_bucket_3y")
+    @classmethod
+    def _influx_bucket_3y_nonblank(cls, v: str) -> str:
+        v = (v or "").strip()
+        if not v:
+            raise ValueError("influx_bucket_3y must not be blank")
+        return v
 
 
 @lru_cache
