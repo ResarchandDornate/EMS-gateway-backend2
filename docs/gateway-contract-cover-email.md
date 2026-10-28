@@ -31,11 +31,15 @@ either confirm each item or send corrections? The open points are:
   retryable, and your retry/backoff behavior.
 - **Rate limits** — expected `/token` and `/ingest` request rates, burst allowances, and backlog
   replay behavior (our limiter exists but is off and unenforced; no numbers are approved).
+- **Cadence & streams** — please confirm the per-substream cadence table and which streams the
+  gateway will send (including any we currently defer) and the expected handling of unsupported
+  streams (see the attached document for the full detail).
 
 Please complete the **Approval Record** at the end of the document (mark each item
 Confirmed/Rejected/Pending with any corrections, and fill in the responsible contact and date)
-and send it back. Nothing is enabled on our side until B1 and B2 are confirmed, so there's no
-rush to answer everything at once — partial confirmations are welcome.
+and send it back. The minimum we need before ingestion rework can proceed is the **transport
+envelope, B1, and B2**; nothing is enabled on our side until those are confirmed in writing, so
+there's no rush to answer everything at once — partial confirmations are welcome.
 
 Happy to walk through any of it on a quick call if that's easier.
 
