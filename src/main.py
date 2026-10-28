@@ -1,3 +1,5 @@
+import asyncio
+
 from fastapi import FastAPI
 from fastapi.responses import JSONResponse
 from redis.asyncio import Redis
@@ -12,8 +14,13 @@ from src.ingestion.router import router as ingest_router
 from src.telemetry.router import router as telemetry_router
 from src.config import get_settings
 from src.database import engine
+from src.influx import InfluxGateway
 from src.logging import configure_logging
 from src.middleware import RequestContextMiddleware
+
+# Bound ONLY the Influx readiness probe so a slow/hung Influx can't stall /ready;
+# Postgres/Redis probe behavior is unchanged in this slice.
+READY_PROBE_TIMEOUT_SECONDS = 3
 
 
 def create_app() -> FastAPI:
@@ -42,6 +49,14 @@ def create_app() -> FastAPI:
             checks["redis"] = "ok"
         except Exception as exc:  # noqa: BLE001 - readiness probe reports any failure
             checks["redis"] = f"error: {type(exc).__name__}"
+        try:
+            healthy = await asyncio.wait_for(
+                InfluxGateway(get_settings()).health(),
+                timeout=READY_PROBE_TIMEOUT_SECONDS,
+            )
+            checks["influx"] = "ok" if healthy else "error: unhealthy"
+        except Exception as exc:  # noqa: BLE001 - reports any failure, incl. TimeoutError
+            checks["influx"] = f"error: {type(exc).__name__}"
         ok = all(v == "ok" for v in checks.values())
         return JSONResponse(
             {"status": "ok" if ok else "unavailable", **checks}, status_code=200 if ok else 503

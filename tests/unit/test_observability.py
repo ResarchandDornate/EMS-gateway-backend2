@@ -4,6 +4,7 @@ The request-correlation middleware is mounted OUTERMOST as src.main.asgi_app (wr
 Starlette's ServerErrorMiddleware), so these tests drive `asgi_app` to exercise the real
 served path. `app` stays the FastAPI instance (dependency_overrides unaffected).
 """
+import asyncio
 import httpx
 import pytest
 import structlog
@@ -228,31 +229,98 @@ class _FakeRedisFactory:
     def from_url(self, _url): return _FakeRedis(self._ok)
 
 
+class _FakeInflux:
+    def __init__(self, *, ok=True, exc=None, hang=False):
+        self._ok, self._exc, self._hang = ok, exc, hang
+    async def health(self):
+        if self._hang:
+            await asyncio.sleep(1)          # exceeds the (test-shortened) probe timeout
+            return True
+        if self._exc is not None:
+            raise self._exc
+        return self._ok                      # True -> 'ok'; False -> 'error: unhealthy'
+
+
+class _FakeInfluxFactory:
+    def __init__(self, **kw): self._kw = kw
+    def __call__(self, _settings=None): return _FakeInflux(**self._kw)
+
+
 async def test_ready_success_shape(monkeypatch):
     monkeypatch.setattr(main, "engine", _FakeEngine(ok=True))
     monkeypatch.setattr(main, "Redis", _FakeRedisFactory(ok=True))
+    monkeypatch.setattr(main, "InfluxGateway", _FakeInfluxFactory(ok=True))
     r = await _get("/ready")
     assert r.status_code == 200
     body = r.json()
     assert body["status"] == "ok" and body["postgres"] == "ok" and body["redis"] == "ok"
+    assert body["influx"] == "ok"
 
 
 async def test_ready_returns_503_when_redis_unavailable(monkeypatch):
     monkeypatch.setattr(main, "engine", _FakeEngine(ok=True))
     monkeypatch.setattr(main, "Redis", _FakeRedisFactory(ok=False))
+    monkeypatch.setattr(main, "InfluxGateway", _FakeInfluxFactory(ok=True))
     r = await _get("/ready")
     assert r.status_code == 503
     body = r.json()
     assert body["status"] == "unavailable" and body["postgres"] == "ok" and body["redis"].startswith("error")
+    assert body["influx"] == "ok"
 
 
 async def test_ready_returns_503_when_postgres_unavailable(monkeypatch):
     monkeypatch.setattr(main, "engine", _FakeEngine(ok=False))
     monkeypatch.setattr(main, "Redis", _FakeRedisFactory(ok=True))
+    monkeypatch.setattr(main, "InfluxGateway", _FakeInfluxFactory(ok=True))
     r = await _get("/ready")
     assert r.status_code == 503
     body = r.json()
     assert body["status"] == "unavailable" and body["postgres"].startswith("error") and body["redis"] == "ok"
+    assert body["influx"] == "ok"
+
+
+async def test_ready_influx_healthy(monkeypatch):
+    monkeypatch.setattr(main, "engine", _FakeEngine(ok=True))
+    monkeypatch.setattr(main, "Redis", _FakeRedisFactory(ok=True))
+    monkeypatch.setattr(main, "InfluxGateway", _FakeInfluxFactory(ok=True))
+    r = await _get("/ready")
+    assert r.status_code == 200 and r.json()["influx"] == "ok"
+
+
+async def test_ready_503_when_influx_unavailable(monkeypatch):
+    monkeypatch.setattr(main, "engine", _FakeEngine(ok=True))
+    monkeypatch.setattr(main, "Redis", _FakeRedisFactory(ok=True))
+    monkeypatch.setattr(main, "InfluxGateway", _FakeInfluxFactory(exc=RuntimeError("influx down")))
+    r = await _get("/ready")
+    assert r.status_code == 503
+    body = r.json()
+    assert body["status"] == "unavailable" and body["postgres"] == "ok" and body["redis"] == "ok"
+    assert body["influx"].startswith("error")
+
+
+async def test_ready_503_when_influx_times_out(monkeypatch):
+    monkeypatch.setattr(main, "engine", _FakeEngine(ok=True))
+    monkeypatch.setattr(main, "Redis", _FakeRedisFactory(ok=True))
+    monkeypatch.setattr(main, "READY_PROBE_TIMEOUT_SECONDS", 0.05)   # keep the test fast
+    monkeypatch.setattr(main, "InfluxGateway", _FakeInfluxFactory(hang=True))
+    r = await _get("/ready")
+    assert r.status_code == 503 and r.json()["influx"] == "error: TimeoutError"
+
+
+async def test_ready_503_when_influx_probe_errors(monkeypatch):
+    monkeypatch.setattr(main, "engine", _FakeEngine(ok=True))
+    monkeypatch.setattr(main, "Redis", _FakeRedisFactory(ok=True))
+    monkeypatch.setattr(main, "InfluxGateway", _FakeInfluxFactory(exc=ValueError("boom")))
+    r = await _get("/ready")
+    assert r.status_code == 503 and r.json()["influx"] == "error: ValueError"
+
+
+async def test_ready_503_when_influx_ping_false(monkeypatch):   # covers the falsy-ping branch
+    monkeypatch.setattr(main, "engine", _FakeEngine(ok=True))
+    monkeypatch.setattr(main, "Redis", _FakeRedisFactory(ok=True))
+    monkeypatch.setattr(main, "InfluxGateway", _FakeInfluxFactory(ok=False))
+    r = await _get("/ready")
+    assert r.status_code == 503 and r.json()["influx"] == "error: unhealthy"
 
 
 async def test_health_unchanged():
