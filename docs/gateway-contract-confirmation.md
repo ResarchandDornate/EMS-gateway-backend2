@@ -2,6 +2,7 @@
 
 **Status:** Draft for gateway/EMS team confirmation
 **Prepared:** 2026-10-25
+**Reviewed:** 2026-10-28 (aligned to current implementation and tests)
 **Scope:** `POST /api/v1/gateway/ingest` (Northbound telemetry ingestion, streams S1 & S2)
 **Current state:** The ingestion endpoint is implemented and tested but **disabled by default**
 (`ingest_enabled = false`); it authenticates the gateway and returns **HTTP 503** until the
@@ -50,6 +51,18 @@ at the end.
   with **409**; a message still being processed returns **409**. A write that fails after the
   message is claimed leaves it retryable (it is **not** acknowledged as stored).
 
+
+---
+
+## Transport envelope (CONFIRM)
+
+The backend currently accepts the **flat `EnvelopeIn`** described above - a single JSON object
+with top-level `records` - posted to `POST /api/v1/gateway/ingest` using a bearer token obtained
+from `POST /api/v1/gateway/token`. A separate `TransportBatch` envelope is **not** implemented.
+
+**Please confirm:** will the gateway send the flat `EnvelopeIn` above, or is a distinct
+`TransportBatch` envelope (e.g. one wrapping multiple messages) required? If the latter, please
+provide its exact field layout so both sides align before ingestion is enabled.
 
 ---
 
@@ -137,6 +150,24 @@ message idempotency hash, not as the point time).
 
 ---
 
+## Payload-hash canonicalization (CONFIRM)
+
+For idempotency the backend computes a SHA-256 over a canonical JSON of **only** the
+telemetry-bearing fields, in sorted-key order with no whitespace. It **includes exactly**:
+`schema_version`, `stream`, `substream`, `sequence`, `created_at_utc`, `record_count`, and
+`records`; it **excludes** `message_id`, `gateway_id`, `site_id`, `organization_id`,
+`compression`, and `gateway_software_version`. The hash is computed over the parsed values, so
+numeric representation (`1` vs `1.0`), timestamp string form (`Z` vs `+00:00`), and `quality`
+casing are currently **significant** - no normalization is applied.
+
+**Please confirm:** that the gateway's notion of a "same payload" retry matches this field set
+and canonical form - in particular, that a retried message reproduces identical
+numeric/timestamp/quality encodings. If the gateway canonicalizes differently, we should agree
+the rule before enabling ingestion so legitimate retries are not misclassified as a changed
+payload (HTTP 409).
+
+---
+
 ## T3 — Long-retention (3-year) signals (CONFIRM)
 
 Our registry classifies these **12** signals as `T3_3Y`.
@@ -193,7 +224,7 @@ Overall-BESS SoC and per-rack SoC are **currently unresolved** in our source (bo
 are explicitly unset; we do not guess, duplicate across racks, or average rack values to
 fabricate an overall figure). Note: an S1 `bess_fast` signal named `soc` exists (asset_type
 `pcs_1`), but it has **not** been confirmed as the authoritative overall-BESS or per-rack SoC.
-The only SoC signals in the S2 `ems_system` substream are `system_max_rack_soc` and
+There is no single `system_soc` field in the registry; the only SoC signals in the S2 `ems_system` substream are `system_max_rack_soc` and
 `system_min_rack_soc` (bank, %, T2_1Y) — **neither is an authoritative overall-BESS SoC**, and
 the registry contains **no whole-rack SoC** signal (rack level has only cell-level and max/min
 aggregates).
@@ -210,8 +241,11 @@ aggregates).
 
 ## Rate limiting (CONFIRM operational requirements)
 
-No rate limiting is implemented yet on `POST /api/v1/gateway/token` or
-`POST /api/v1/gateway/ingest`. To design it from real requirements, please provide:
+A rate-limiting **mechanism** now exists for `POST /api/v1/gateway/token` and
+`POST /api/v1/gateway/ingest`, but it is **disabled by default and not enforcing**
+(`rate_limit_enabled = false`, `rate_limit_enforce = false`; shadow mode only - it never blocks
+and never returns 429). No limits are configured and **no numeric values are approved**. To set
+them from real requirements, please provide:
 1. Expected **token** request rate per gateway (and token lifetime/refresh behavior).
 2. Expected **ingest** request rate and message size per gateway (steady-state and peak).
 3. **Burst** limits and expected **retry/backoff** behavior on 429/503 (so retries interact
