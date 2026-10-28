@@ -285,3 +285,125 @@ def test_canonical_hash_ignores_transport_and_identity_metadata():
     assert canonical_hash(_env(gateway_software_version="9.9.9")) == h    # transport
     assert canonical_hash(_env(gateway_id="DIFFERENT")) == h              # identity excluded
     assert canonical_hash(_env(site_id="OTHER")) == h
+
+
+# ---------------- P1 characterization: payload-hash serialization sensitivity ----------------
+# These tests DOCUMENT current canonical_hash behavior; they are NOT a permanent gateway
+# contract. canonical_hash serializes the parsed values as-is (no numeric or timestamp
+# normalization), so logically-equivalent values can hash differently. If the gateway
+# contract later requires normalization before hashing, the expected-"different" assertions
+# below are the intended failure points and must be updated then.
+
+def test_canonical_hash_numeric_representation_is_sensitive():
+    """CHARACTERIZATION (current behavior, not a contract): record value 1 (int), 1.0 (float)
+    and "1" (str) hash DIFFERENTLY. Documents a known retry-serialization sensitivity; do NOT
+    read as desired behavior. Update if a numeric-normalization contract is adopted."""
+    def h_with(v):
+        e = _env()
+        e["records"][0]["value"] = v
+        return canonical_hash(e)
+    h_int, h_float, h_str = h_with(1), h_with(1.0), h_with("1")
+    assert h_int != h_float          # 1 -> "1"   vs  1.0 -> "1.0"
+    assert h_int != h_str            # 1 -> "1"   vs  "1" -> "\"1\""
+    assert h_float != h_str
+
+
+def test_canonical_hash_timestamp_string_form_is_sensitive():
+    """CHARACTERIZATION (current behavior, not a contract): the same instant written "+00:00"
+    vs "Z" hashes DIFFERENTLY for both the record timestamp and created_at_utc, because
+    canonical_hash compares raw strings (no timestamp parsing). Update if a timestamp-
+    normalization contract is adopted."""
+    base = _env()
+    rec_z = _env()
+    rec_z["records"][0]["timestamp"] = "2026-09-04T07:59:14Z"
+    assert canonical_hash(base) != canonical_hash(rec_z)
+    assert canonical_hash(base) != canonical_hash(_env(created_at_utc="2026-09-04T07:59:14Z"))
+
+
+def test_canonical_hash_quality_casing_is_sensitive():
+    """CHARACTERIZATION (current behavior, not a contract): quality "good" vs "GOOD" hash
+    DIFFERENTLY because canonical_hash runs before quality normalization. Not a desired-state
+    assertion; update if a normalization contract is adopted."""
+    e = _env()
+    e["records"][0]["quality"] = "GOOD"
+    assert canonical_hash(_env()) != canonical_hash(e)
+
+
+async def test_new_message_id_is_separate_ledger_identity(session):
+    """CHARACTERIZATION (current behavior): a different message_id with the SAME payload on the
+    SAME gateway is a separate ledger identity (no cross-message dedup) -> both CLAIMED, two
+    rows. Dedup is keyed on (gateway_id, message_id); the payload hash only dedups WITHIN a key."""
+    gw = await _mk_gateway(session, org_key="o1", site_key="s1", gateway_key="g1", client_id="c1")
+    payload_hash = canonical_hash(_env())
+    mid_a, mid_b = uuid.uuid4(), uuid.uuid4()
+    d_a, t_a = await claim_or_resolve(session, gateway_id=gw.id, stream="S2", message_id=mid_a,
+                                      sequence=1, record_count=1, payload_hash=payload_hash)
+    d_b, t_b = await claim_or_resolve(session, gateway_id=gw.id, stream="S2", message_id=mid_b,
+                                      sequence=1, record_count=1, payload_hash=payload_hash)
+    assert d_a == IngestDecision.CLAIMED and d_b == IngestDecision.CLAIMED
+    assert t_a is not None and t_b is not None and t_a != t_b
+    assert not session.in_transaction()
+    rows = (await session.execute(
+        select(IngestMessageModel).where(IngestMessageModel.gateway_id == gw.id))).scalars().all()
+    assert len(rows) == 2 and {r.message_id for r in rows} == {mid_a, mid_b}
+
+
+# ---------------- P2 characterization: hashed-field coverage + serialization invariances ----------------
+# Still CHARACTERIZATION of current canonical_hash behavior, not a permanent contract.
+#   (1) each of the 7 included fields is load-bearing (changing it changes the digest);
+#   (2) input key order does NOT change the hash;
+#   (3) source-JSON whitespace does NOT change the hash (hash is over the PARSED structure);
+#   (4) completeness: excluded message_id / organization_id do NOT change the hash.
+# If a normalization contract is later adopted, (1) stays true; (2)-(4) are expected to remain
+# true (they are serialization / exclusion invariances, not value normalization).
+
+def test_canonical_hash_each_included_field_is_load_bearing():
+    """CHARACTERIZATION: the 7 fields copied into canon each affect the hash; changing any one
+    while holding the rest fixed changes the digest. (value-field sensitivity is already covered
+    by test_canonical_hash_deterministic_and_sensitive.) Not a desired-state assertion.
+
+    NOTE: the record_count=2 case deliberately leaves records length 1. canonical_hash does NOT
+    validate the envelope, so this isolates record_count as a load-bearing hash input; it is a
+    hash-isolation check, NOT a schema-validity test."""
+    h = canonical_hash(_env())
+    assert canonical_hash(_env(schema_version="2.0")) != h
+    assert canonical_hash(_env(stream="S3")) != h
+    assert canonical_hash(_env(substream="pcs")) != h
+    assert canonical_hash(_env(sequence=2)) != h
+    assert canonical_hash(_env(created_at_utc="2026-09-04T08:00:00+00:00")) != h
+    assert canonical_hash(_env(record_count=2)) != h
+    rec = _env()
+    rec["records"][0]["signal_key"] = "k2"
+    assert canonical_hash(rec) != h          # records content is load-bearing
+
+
+def test_canonical_hash_key_order_independent():
+    """CHARACTERIZATION: reordering keys does NOT change the hash. Top-level field order is
+    irrelevant because canon is rebuilt by explicit field lookup; nested record-key order is
+    normalized by json.dumps(sort_keys=True)."""
+    base = _env()
+    reordered = {k: base[k] for k in reversed(list(base.keys()))}
+    reordered["records"] = [{k: r[k] for k in reversed(list(r.keys()))} for r in base["records"]]
+    assert canonical_hash(reordered) == canonical_hash(base)
+
+
+def test_canonical_hash_whitespace_independent():
+    """CHARACTERIZATION: two JSON encodings of the SAME envelope differing only in whitespace
+    (compact vs indented) hash identically, because canonical_hash operates on the parsed
+    structure (separators=(",", ":")), not the wire bytes. Round-trip through json is
+    type-preserving for these values (int stays int, float stays float)."""
+    import json
+    base = _env()
+    compact = json.loads(json.dumps(base, separators=(",", ":")))
+    indented = json.loads(json.dumps(base, indent=4))
+    assert canonical_hash(compact) == canonical_hash(indented) == canonical_hash(base)
+
+
+def test_canonical_hash_ignores_remaining_identity_metadata():
+    """CHARACTERIZATION (completeness): message_id and organization_id are NOT part of canon,
+    so changing either does not change the hash. Complements the existing
+    test_canonical_hash_ignores_transport_and_identity_metadata (which covers compression,
+    gateway_software_version, gateway_id, site_id)."""
+    h = canonical_hash(_env())
+    assert canonical_hash(_env(message_id=str(uuid.uuid4()))) == h
+    assert canonical_hash(_env(organization_id="OTHER")) == h

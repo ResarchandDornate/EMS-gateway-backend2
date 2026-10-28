@@ -374,3 +374,54 @@ async def test_retry_after_write_failure_converges(client, session, enabled):
     r2 = await c.post(URL, json=env, headers=_auth(gw))
     assert r2.status_code == 200 and r2.json()["status"] == "stored"
     assert (await _row(session, env["message_id"])).status == "stored"
+
+
+# ===================== P3 characterization: retry idempotency + auth-order =====================
+# CHARACTERIZATION of current endpoint behavior, not a permanent gateway contract.
+
+async def test_retry_duplicate_ignores_hash_excluded_metadata(client, session, enabled):
+    """P3 CHARACTERIZATION: once a row is STORED, re-POSTing the SAME (gateway_id, message_id)
+    with only a hash-excluded transport field changed (gateway_software_version) returns
+    200 status="duplicate" and performs NO second telemetry write. Retry idempotency is keyed
+    on (gateway_id, message_id) + payload hash; transport metadata does not affect it.
+    gateway_id/message_id are held constant (same ledger identity); site_id/organization_id are
+    NOT varied here because a scope change would 403 before the ledger (see the auth-order test)."""
+    c, _ = client; app = enabled
+    stub = _StubInflux(); app.dependency_overrides[get_influx_gateway] = lambda: stub
+    org, site, gw = await _mk(session, o="o1", s="s1", g="g1", c="c1")
+    env = _env(org, site, gw)
+    h = canonical_hash(EnvelopeIn(**env).model_dump())
+    session.add(IngestMessageModel(gateway_id=gw.id, message_id=uuid.UUID(env["message_id"]),
+                                   stream="S2", sequence=1, record_count=1, payload_hash=h, status="stored"))
+    await session.commit()
+    # retry: same ledger identity, only a hash-excluded transport field differs
+    retry = {**env, "gateway_software_version": "9.9.9"}
+    assert canonical_hash(EnvelopeIn(**retry).model_dump()) == h      # metadata does NOT alter the hash
+    r = await c.post(URL, json=retry, headers=_auth(gw))
+    assert r.status_code == 200 and r.json()["status"] == "duplicate"
+    assert stub.writes == []                     # no second telemetry write
+    assert await _count(session) == 1            # still exactly the one pre-seeded row
+
+
+async def test_scope_mismatch_403_precedes_payload_hash(client, session, enabled, monkeypatch):
+    """P3 CHARACTERIZATION: a changed scope identifier returns 403 BEFORE any payload-hash
+    comparison or ledger claim. canonical_hash and claim_or_resolve are patched to raise; a 403
+    (not an AssertionError/500) proves verify_scope runs first. Complements test_scope_mismatch_403
+    by pinning the ORDER, not just the status code."""
+    c, _ = client; app = enabled
+    app.dependency_overrides[get_influx_gateway] = lambda: _StubInflux()
+    import src.ingestion.router as R
+
+    def _boom_sync(*a, **k):
+        raise AssertionError("payload hashing reached despite scope mismatch")
+
+    async def _boom_async(*a, **k):
+        raise AssertionError("ledger claim reached despite scope mismatch")
+
+    monkeypatch.setattr(R, "canonical_hash", _boom_sync)
+    monkeypatch.setattr(R, "claim_or_resolve", _boom_async)
+    org, site, gw = await _mk(session, o="o1", s="s1", g="g1", c="c1")
+    env = _env(org, site, gw); env["organization_id"] = str(uuid.uuid4())   # scope identifier changed
+    r = await c.post(URL, json=env, headers=_auth(gw))
+    assert r.status_code == 403
+    assert await _count(session) == 0            # no ledger claim created
