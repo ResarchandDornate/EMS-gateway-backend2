@@ -23,6 +23,23 @@ class Settings(BaseSettings):
     # 9b-ii-c live-ingestion gate (default OFF; record contract still PROVISIONAL)
     ingest_enabled: bool = False
 
+    # --- Rate limiting (MECHANISM only; enforcement OFF by default). ---
+    # NONE of the numbers below are approved operational policy; they are unset
+    # placeholders pending gateway/ops confirmation. The limiter is a hard no-op
+    # unless rate_limit_enabled=True AND a policy's capacity+refill are configured.
+    rate_limit_enabled: bool = False          # master switch (default OFF)
+    rate_limit_enforce: bool = False          # False => SHADOW (never blocks / no 429)
+    rate_limit_redis_timeout_seconds: float = 0.05        # bounded per-check (fail-open)
+    rate_limit_redis_connect_timeout_seconds: float = 0.25
+    rate_limit_redis_socket_timeout_seconds: float = 0.25
+    token_rate_capacity: int | None = None                # UNAPPROVED placeholder
+    token_rate_refill_per_sec: float | None = None        # UNAPPROVED placeholder
+    ingest_rate_capacity: int | None = None               # UNAPPROVED placeholder
+    ingest_rate_refill_per_sec: float | None = None       # UNAPPROVED placeholder
+    # Fallback-bucket MEMORY bounds (mechanism sizing, NOT a rate/burst/replay policy):
+    rate_limit_local_fallback_max_keys: int = 10_000
+    rate_limit_local_fallback_idle_seconds: float = 300.0
+
     # auth / OTP
     otp_provider: str = "mock"            # "mock" now; "msg91" once the account is live
     msg91_auth_key: str | None = None
@@ -37,6 +54,43 @@ class Settings(BaseSettings):
         v = (v or "").strip()
         if not v:
             raise ValueError("influx_bucket_3y must not be blank")
+        return v
+
+    @field_validator("token_rate_capacity", "ingest_rate_capacity")
+    @classmethod
+    def _rl_capacity_nonneg(cls, v):
+        if v is not None and v < 0:
+            raise ValueError("rate capacity must be >= 0 or null")
+        return v
+
+    @field_validator("token_rate_refill_per_sec", "ingest_rate_refill_per_sec")
+    @classmethod
+    def _rl_refill_nonneg(cls, v):
+        if v is not None and v < 0:
+            raise ValueError("rate refill must be >= 0 or null")
+        return v
+
+    @field_validator("rate_limit_redis_timeout_seconds",
+                     "rate_limit_redis_connect_timeout_seconds",
+                     "rate_limit_redis_socket_timeout_seconds")
+    @classmethod
+    def _rl_timeout_positive(cls, v):
+        if v is None or v <= 0:
+            raise ValueError("rate-limit timeout seconds must be > 0")
+        return v
+
+    @field_validator("rate_limit_local_fallback_max_keys")
+    @classmethod
+    def _rl_maxkeys_positive(cls, v):
+        if v < 1:
+            raise ValueError("rate_limit_local_fallback_max_keys must be >= 1")
+        return v
+
+    @field_validator("rate_limit_local_fallback_idle_seconds")
+    @classmethod
+    def _rl_idle_nonneg(cls, v):
+        if v < 0:
+            raise ValueError("rate_limit_local_fallback_idle_seconds must be >= 0")
         return v
 
 

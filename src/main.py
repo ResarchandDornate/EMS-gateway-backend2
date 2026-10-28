@@ -1,4 +1,5 @@
 import asyncio
+from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
 from fastapi.responses import JSONResponse
@@ -17,15 +18,26 @@ from src.database import engine
 from src.influx import InfluxGateway
 from src.logging import configure_logging
 from src.middleware import RequestContextMiddleware
+from src.ratelimit import init_rate_limiter, shutdown_rate_limiter
 
-# Bound ONLY the Influx readiness probe so a slow/hung Influx can't stall /ready;
-# Postgres/Redis probe behavior is unchanged in this slice.
+# Bound the Influx AND Redis readiness probes so a slow/hung dependency can't stall
+# /ready; the Postgres probe is unchanged in this slice.
 READY_PROBE_TIMEOUT_SECONDS = 3
+
+
+@asynccontextmanager
+async def _lifespan(app: FastAPI):
+    # Build the shared rate limiter (no-op unless rate_limit_enabled). Never fails startup.
+    await init_rate_limiter(app)
+    try:
+        yield
+    finally:
+        await shutdown_rate_limiter(app)
 
 
 def create_app() -> FastAPI:
     configure_logging()
-    app = FastAPI(title="UnityESS Central EMS")
+    app = FastAPI(title="UnityESS Central EMS", lifespan=_lifespan)
 
     @app.get("/health")
     async def health() -> dict[str, str]:
@@ -43,7 +55,7 @@ def create_app() -> FastAPI:
         try:
             client = Redis.from_url(get_settings().redis_url)
             try:
-                await client.ping()
+                await asyncio.wait_for(client.ping(), timeout=READY_PROBE_TIMEOUT_SECONDS)
             finally:
                 await client.aclose()
             checks["redis"] = "ok"
