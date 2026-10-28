@@ -139,13 +139,29 @@ message idempotency hash, not as the point time).
 
 ## T3 — Long-retention (3-year) signals (CONFIRM)
 
-Our registry classifies these **12** signals as `T3_3Y`. There is **no 3-year retention
-bucket configured** today — only two buckets exist: `telemetry_raw_90d` (S1) and `telemetry_1y`
-(S2). Their **90-day / 365-day durations are development/configuration values** (from
-`docker-compose.yml`) and are **not an independently verified production retention guarantee**;
-the deployed InfluxDB instance's actual retention policies must be verified separately. These
-12 signals therefore **fail closed**: a message containing any of them is currently rejected
-with **HTTP 501** and nothing is stored. We will **not** invent a bucket or reroute them.
+Our registry classifies these **12** signals as `T3_3Y`.
+
+(a) **Implemented backend routing (source-verified):** the backend routes `T3_3Y` to a dedicated
+3-year bucket, **`telemetry_3y`** (`src/config.py`), and such messages are **accepted and written**
+when ingestion is enabled. Fail-closed behavior (-> HTTP 501) applies **only** when that bucket is
+missing/blank, not on the normal path. This code path is exercised by the test
+`test_t3_stored_200` - that is **test evidence for the code path only**, not proof of production
+behavior or of any deployed retention guarantee.
+
+(b) **Configured / proposed retention (NOT approved):** the T3 bucket's retention is a configured
+value of **1095 days** (`influx_bucket_3y_retention_seconds`, default 94,608,000 s), explicitly
+**proposed and not production-approved**. It is checked against the configured seconds only at
+provisioning time (`src/influx_provision.py`).
+
+(c) **Deployed InfluxDB policy (UNVERIFIED):** the actual retention policy enforced on the deployed
+InfluxDB instance has **not** been independently verified and must be confirmed separately. The
+S1/S2 `telemetry_raw_90d` / `telemetry_1y` durations are likewise development `docker-compose.yml`
+values, not verified production guarantees.
+
+Because (b) and (c) are unresolved, a configured T3 bucket **does not make enabling ingestion
+safe** - it only means T3 data would be written to a bucket whose production retention is neither
+approved nor verified. We will **not** represent any of these as production-approved, and we will
+**not** invent a bucket or reroute signals.
 
 | # | Stream/Substream | `signal_key` | asset_type | type | unit |
 |---|---|---|---|---|---|
@@ -162,11 +178,12 @@ with **HTTP 501** and nothing is stored. We will **not** invent a bucket or rero
 | 11 | S2/bms_extended | `rack_accumulated_charge_energy` | rack | FLOAT32 | kWh |
 | 12 | S2/bms_extended | `rack_accumulated_discharge_energy` | rack | FLOAT32 | kWh |
 
-**Please confirm ONE of:**
-- (a) The intended **3-year retention bucket/policy** for these signals and **when** the
-  gateway will start transmitting them; or
-- (b) That gateways will **not** send these 12 signals in current S1/S2 batches until a
-  retention policy is approved (so they do not trigger 501 rejections).
+**Please confirm:**
+- (a) The **production-approved 3-year retention policy** (duration and bucket) for these 12
+  signals, and confirmation that the **deployed InfluxDB** retention matches it (today the
+  1095-day value is configured/proposed only, and the deployed policy is unverified); and
+- (b) **When** the gateway will begin transmitting these signals, so retention is approved and
+  verified before sustained 3-year data accumulates.
 
 ---
 
@@ -219,9 +236,15 @@ Please mark each item and return to the EMS backend team.
 | T3 — 3-year retention decision | | |
 | SoC — authoritative mappings | | |
 | Rate limiting — operational rates | | |
+| Transport/envelope & endpoint - flat `EnvelopeIn` at `POST /api/v1/gateway/token` + `/ingest`, or is a separate `TransportBatch` contract required? | | |
+| Streams - which streams will the gateway send (including any currently deferred by the backend), and what handling is expected for unsupported streams? | | |
+| Payload-hash canonicalization - do gateway and backend agree on the exact canonical form (numeric representation, timestamp strings, quality casing)? | | |
+| Retry semantics - which HTTP statuses are final vs retryable, and the agreed retry/backoff and duplicate-acknowledgement behavior? | | |
+| T3 production retention - approved duration and deployed InfluxDB policy for the 12 T3 signals, and who verifies them? | | |
 
 **Responsible contact (gateway/EMS team):** ______________________
 **Confirmation date:** ______________________
 
-> Until B1 and B2 are confirmed, ingestion remains gated OFF. T3 signals remain fail-closed
-> until a retention policy is approved. SoC remains unresolved and will not be fabricated.
+> Until B1 and B2 are confirmed, ingestion remains gated OFF. T3 signals are ingested to the
+> configured `telemetry_3y` bucket, but their 3-year retention guarantee is proposed/unapproved
+> and the deployed InfluxDB policy is unverified. SoC remains unresolved and will not be fabricated.
