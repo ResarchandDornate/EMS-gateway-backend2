@@ -11,6 +11,7 @@ from src.ingestion.mapping import build_message_points
 from src.ingestion.providers import (get_influx_gateway, get_registry_index,
                                       require_ingest_enabled)
 from src.ingestion.schemas import EnvelopeIn, IngestAck
+from src.ratelimit import ingest_rate_limit
 from src.ingestion.service import (IngestDecision, canonical_hash, claim_or_resolve,
                                    mark_stored, route_stream, verify_scope)
 from src.telemetry_errors import (InfluxTelemetryError, RetentionNotConfigured,
@@ -22,6 +23,7 @@ router = APIRouter(prefix="/api/v1/gateway", tags=["ingestion"])
 @router.post("/ingest", response_model=IngestAck)
 async def ingest(
     request: Request,
+    _rl=Depends(ingest_rate_limit),          # rate limiter BEFORE gate + ledger claim (shadow by default)
     gw=Depends(require_ingest_enabled),          # auth (401/403) -> gate (503) -> here
     session: AsyncSession = Depends(get_session),
     index=Depends(get_registry_index),
