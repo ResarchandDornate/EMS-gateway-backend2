@@ -46,7 +46,8 @@ async def otp_request(
     if channel == "sms":                      # phone only for now; email later
         code = await create_challenge(
             session, user_id=user.id, channel=channel, destination=destination)
-        await provider.send_sms(destination, code)
+        await session.commit()                       # persist challenge BEFORE any SMS I/O
+        await provider.send_sms(destination, code)   # network I/O runs with no open transaction
     return OtpRequestOut()
 
 
@@ -57,7 +58,9 @@ async def otp_verify(body: OtpVerifyIn, session: AsyncSession = Depends(get_sess
         raise HTTPException(status.HTTP_404_NOT_FOUND, "User not registered")
     if not (await get_role_names(session, user.id) & OTP_ROLES):
         raise HTTPException(status.HTTP_403_FORBIDDEN, "OTP login is not allowed for this account")
-    if not await verify_code(session, user_id=user.id, code=body.otp):
+    ok = await verify_code(session, user_id=user.id, code=body.otp)
+    await session.commit()                    # persist attempts (wrong code) or consumption (success)
+    if not ok:
         raise HTTPException(status.HTTP_401_UNAUTHORIZED, "Invalid or expired OTP")
     return TokenResponse(access_token=create_access_token(user.id))
 
