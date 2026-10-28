@@ -3,8 +3,10 @@ import re
 from datetime import datetime, timedelta, timezone
 
 from src.influx import parse_contract_timestamp
+from src.streams import INGEST_STREAMS
 
-SUPPORTED_STREAMS = {"S1", "S2"}
+# Telemetry read supports exactly the ingest-eligible streams (single source: src/streams).
+SUPPORTED_STREAMS = INGEST_STREAMS
 MAX_WINDOW = timedelta(days=7)
 DEFAULT_LIMIT = 1000
 MAX_LIMIT = 5000

@@ -33,7 +33,7 @@ from sqlalchemy import select, update
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 
 from src.ingestion.models import IngestMessageModel
-from src.ingestion.schemas import DEFERRED_STREAMS, INGEST_STREAMS
+from src.streams import DEFERRED_STREAMS, INGEST_STREAMS
 
 LEASE_TTL_SECONDS = 60     # must exceed p99 end-to-end single-message write latency
 
