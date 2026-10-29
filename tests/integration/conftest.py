@@ -15,6 +15,13 @@ from src.auth import models as _a  # noqa: F401
 from src.rbac import models as _r  # noqa: F401
 from src.signals import models as _sig  # noqa: F401
 from src.ingestion import models as _ing  # noqa: F401
+from src.ingestion import health_models as _ingh  # noqa: F401
+from src.ingestion import alarm_models as _inga  # noqa: F401
+from src.ingestion import controller_models as _ingc  # noqa: F401
+from src.ingestion import solis_models as _ings  # noqa: F401
+from src.ingestion import edge_ai_models as _inge  # noqa: F401
+from src.ingestion import config_audit_models as _ingca  # noqa: F401
+from src.ingestion import command_result_models as _ingcr  # noqa: F401
 from src.auth.otp_provider import MockOtpProvider, get_otp_provider
 from src.database import get_session
 from src.main import app

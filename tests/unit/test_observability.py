@@ -353,3 +353,24 @@ async def test_logging_failure_does_not_mask_original_exception(monkeypatch):
     with pytest.raises(ValueError):          # the ORIGINAL exception, not the logger's RuntimeError
         await mw(scope, receive, send)
     assert "request_id" not in structlog.contextvars.get_contextvars()
+
+
+class _FakeConnHang:
+    async def __aenter__(self):
+        await asyncio.sleep(1)          # exceeds the (test-shortened) probe timeout
+        return self
+    async def __aexit__(self, *a): return False
+    async def execute(self, *a, **k): return None
+
+
+class _FakeEngineHang:
+    def connect(self): return _FakeConnHang()
+
+
+async def test_ready_503_when_postgres_times_out(monkeypatch):   # postgres probe is bounded too
+    monkeypatch.setattr(main, "engine", _FakeEngineHang())
+    monkeypatch.setattr(main, "Redis", _FakeRedisFactory(ok=True))
+    monkeypatch.setattr(main, "InfluxGateway", _FakeInfluxFactory(ok=True))
+    monkeypatch.setattr(main, "READY_PROBE_TIMEOUT_SECONDS", 0.05)   # keep the test fast
+    r = await _get("/ready")
+    assert r.status_code == 503 and r.json()["postgres"] == "error: TimeoutError"

@@ -12,12 +12,16 @@ The placeholder submodules (s1_fast_bess, ... d1_commands, envelope) are unused 
 and are left untouched.
 """
 
-# Streams accepted by the ingestion write path. Telemetry read support mirrors this set
-# (see SUPPORTED_STREAMS in src/telemetry/service.py).
+# Streams accepted by the numeric (Influx) ingestion write path. Telemetry read support
+# mirrors this set (see SUPPORTED_STREAMS in src/telemetry/service.py).
 INGEST_STREAMS = frozenset({"S1", "S2"})
 
+# Structured-record streams: validated + persisted to PostgreSQL JSONB (NOT Influx),
+# e.g. S3 gateway_health. Routed to the structured service, not the numeric path.
+STRUCTURED_STREAMS = frozenset({"S3", "S4", "S8"})
+
 # Recognized by the contract but not yet implemented -> HTTP 501 at ingest.
-DEFERRED_STREAMS = frozenset({"S3", "S4", "S5", "S6", "S7", "S8", "S9", "D1"})
+DEFERRED_STREAMS = frozenset({"S5", "S6", "S7", "S9", "D1"})
 
 # Every stream the envelope validator accepts; anything else -> HTTP 422.
-KNOWN_STREAMS = INGEST_STREAMS | DEFERRED_STREAMS   # frozenset | frozenset -> frozenset
+KNOWN_STREAMS = INGEST_STREAMS | STRUCTURED_STREAMS | DEFERRED_STREAMS

@@ -180,7 +180,7 @@ async def init_rate_limiter(app) -> None:
     fail-open (per-process fallback only)."""
     s = get_settings()
     app.state.rate_limiter = None
-    if not s.rate_limit_enabled:
+    if not (s.rate_limit_enabled or s.otp_rate_limit_enabled):
         return
     try:
         from redis.asyncio import Redis
