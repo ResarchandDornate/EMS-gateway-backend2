@@ -5,7 +5,8 @@ from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.auth.otp import (create_challenge, verify_code, lock_user,
-                          recent_attempt_total, supersede_prior_challenges)
+                          recent_attempt_total, supersede_prior_challenges,
+                          purge_stale_challenges)
 from src.auth.otp_provider import OtpDeliveryProvider, get_otp_provider
 from src.auth.repository import UserRepository
 from src.auth.schemas import (LoginRequest, OtpRequestIn, OtpRequestOut,
@@ -57,6 +58,13 @@ async def otp_request(
         if _s.otp_rate_limit_enabled and _s.otp_verify_cap is not None:
             await lock_user(session, user.id)                  # F2: serialize per user
             await supersede_prior_challenges(session, user.id)  # F2: only newest code is live
+        if _s.otp_challenge_cleanup_enabled:                   # F5: best-effort, must never break OTP
+            try:
+                async with session.begin_nested():
+                    await purge_stale_challenges(
+                        session, user.id, _s.otp_challenge_retention_seconds)
+            except Exception as _e:
+                _otp_log.warning("otp_cleanup_failed", exc_type=type(_e).__name__)
         code = await create_challenge(
             session, user_id=user.id, channel=channel, destination=destination)
         await session.commit()                       # persist challenge BEFORE any SMS I/O

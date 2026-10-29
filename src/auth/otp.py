@@ -1,7 +1,7 @@
 import secrets
 from datetime import datetime, timedelta, timezone
 
-from sqlalchemy import func, select, text, update
+from sqlalchemy import delete, func, select, text, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.auth.models import OtpChallengeModel
@@ -70,3 +70,14 @@ async def supersede_prior_challenges(session, user_id) -> None:
         update(OtpChallengeModel)
         .where(OtpChallengeModel.user_id == user_id, OtpChallengeModel.consumed_at.is_(None))
         .values(consumed_at=datetime.now(timezone.utc)))
+
+async def purge_stale_challenges(session, user_id, retention_seconds: int) -> None:
+    """Best-effort delete of this user's fully-expired challenges whose expiry is older than
+    the retention horizon. Retention is enforced >= the F2 window, so rows still counted by
+    recent_attempt_total are never removed. Uses ix_otp_challenges_user_id (few rows/user).
+    Keyed on expires_at (indexed); live challenges (expires_at > now) are never matched."""
+    cutoff = datetime.now(timezone.utc) - timedelta(seconds=retention_seconds)
+    await session.execute(
+        delete(OtpChallengeModel).where(
+            OtpChallengeModel.user_id == user_id,
+            OtpChallengeModel.expires_at < cutoff))

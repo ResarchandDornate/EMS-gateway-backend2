@@ -1,6 +1,6 @@
 from functools import lru_cache
 
-from pydantic import Field, field_validator
+from pydantic import Field, field_validator, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -65,6 +65,9 @@ class Settings(BaseSettings):
     # F2 cumulative verification cap (DB-backed; independent of Redis).
     otp_verify_cap: int | None = None                  # max verifies per user per window
     otp_verify_cap_window_seconds: int = 900           # rolling window (>= 3x the 5-min TTL)
+    # F5 expired-challenge cleanup (on-write, per-user). Inert by default.
+    otp_challenge_cleanup_enabled: bool = False        # default OFF -> no behavior change
+    otp_challenge_retention_seconds: int = 86400       # must be >= otp_verify_cap_window_seconds
 
     @field_validator("influx_bucket_3y")
     @classmethod
@@ -140,6 +143,21 @@ class Settings(BaseSettings):
         if v < 1:
             raise ValueError("otp_verify_cap_window_seconds must be >= 1")
         return v
+
+    @field_validator("otp_challenge_retention_seconds")
+    @classmethod
+    def _otp_retention_positive(cls, v):
+        if v < 1:
+            raise ValueError("otp_challenge_retention_seconds must be >= 1")
+        return v
+
+    @model_validator(mode="after")
+    def _otp_retention_covers_window(self):
+        # cleanup must never delete rows still counted by the F2 window
+        if self.otp_challenge_retention_seconds < self.otp_verify_cap_window_seconds:
+            raise ValueError(
+                "otp_challenge_retention_seconds must be >= otp_verify_cap_window_seconds")
+        return self
 
 
 @lru_cache
