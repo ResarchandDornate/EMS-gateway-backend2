@@ -51,16 +51,20 @@ def test_field_types_supported():
 def test_field_type_unsupported():
     with pytest.raises(UnsupportedDataType): field_type("STRING")
 
-def test_field_type_rejects_registry_alarm_and_data_types():
-    # Characterization: the seed registry defines system_alarm / system_data signals, which have
-    # no numeric field_type and are therefore NOT ingestable today (coerce -> UnsupportedDataType
-    # -> HTTP 422 upstream). This pins the contract gap: accepting them requires an agreed gateway
-    # encoding, not a silent change.
-    for dt in ("system_alarm", "system_data"):
+def test_field_type_rejects_nonnumeric_data_type_strings():
+    # "system_alarm" / "system_data" are registry *category* labels, NOT data_types. The signals in
+    # those categories carry numeric data_types (U16 / FLOAT32) and ingest as numeric points today;
+    # load_registry_index does not even carry `category` into the write path. This test only pins that
+    # field_type/coerce reject a *data_type* string that is not a known numeric type -- it does NOT
+    # imply those category signals are unsupported.
+    for not_a_data_type in ("system_alarm", "system_data"):
         with pytest.raises(UnsupportedDataType):
-            field_type(dt)
+            field_type(not_a_data_type)
         with pytest.raises(UnsupportedDataType):
-            coerce(dt, 1)
+            coerce(not_a_data_type, 1)
+    # the numeric data_types those categories actually use ARE accepted:
+    assert field_type("U16") == "int"
+    assert field_type("FLOAT32") == "float"
 
 def test_u16_bounds():
     assert coerce("U16", 0) == 0 and coerce("U16", 65535) == 65535
