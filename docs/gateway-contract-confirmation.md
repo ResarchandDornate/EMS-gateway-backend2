@@ -108,7 +108,7 @@ If utility-meter data is in scope for this gateway, it must be defined and added
 | `source_id` | string (≤128) | required | Tag; identifies the data source |
 | `asset_id` | string (≤128) | required | Tag; identifies the asset (e.g. rack/bank/PCS) |
 | `signal_key` | string (≤128) | required | Must exist in the registry for that substream |
-| `value` | number (float/int) | required (non-null) | Schema accepts number/string/bool/null, but the backend **coerces to the registry's numeric type and rejects (HTTP 422) any non-numeric or null value** for all current signals. See B1 Q3. |
+| `value` | number (float/int) | required (non-null) | Schema accepts number/string/bool/null. For **numeric-typed** signals the backend coerces to the registry's numeric type and **rejects (HTTP 422) any non-numeric or null value**; the registry also defines `system_alarm`/`system_data` signals, which the backend currently rejects with HTTP 422 until an encoding is agreed. See B1 Q3. |
 | `quality` | string or null (≤32) | optional | Backend accepts only `good`/`stale`/`offline`/`error` (case-insensitive) or null; any other value is rejected (HTTP 422). See B1 Q5. |
 | `timestamp` | string | required | See B2 |
 
@@ -117,11 +117,13 @@ If utility-meter data is in scope for this gateway, it must be defined and added
 2. A **representative real JSON envelope + records** example (one S1 `bess_fast` and one S2
    `bms_extended` message), including field types, which fields are required vs optional, and
    nullability.
-3. `value` encoding: **the backend currently rejects (HTTP 422) any non-numeric or null
-   value**, because every signal in the registry is numeric. Please confirm whether any
-   signals — especially **state / status / enumerated / alarm** signals — are sent as strings,
-   booleans, or null. If so, we must agree on an encoding (e.g. numeric codes) before enabling
-   ingestion; we will not silently narrow or widen the contract.
+3. `value` encoding: for **numeric-typed** signals the backend coerces the value to its registry
+   type and **rejects (HTTP 422) any non-numeric or null value**. The registry also defines
+   `system_alarm` and `system_data` signals, which the backend currently rejects with HTTP 422
+   pending an agreed encoding. Please confirm whether any signals — especially **state / status /
+   enumerated / alarm** signals — are sent as strings, booleans, or null. If so, we must agree on
+   an encoding (e.g. numeric codes) before enabling ingestion; we will not silently narrow or
+   widen the contract.
 4. That the `gateway_id`/`site_id`/`organization_id` the gateway will send are the registered
    UUIDs (so the 403 scope check passes).
 5. `quality` values: the backend accepts only `good`/`stale`/`offline`/`error` (or null).
@@ -270,7 +272,7 @@ Please mark each item and return to the EMS backend team.
 | T3 — 3-year retention decision | | |
 | SoC — authoritative mappings | | |
 | Rate limiting — operational rates | | |
-| Transport/envelope & endpoint - flat `EnvelopeIn` at `POST /api/v1/gateway/token` + `/ingest`, or is a separate `TransportBatch` contract required? | | |
+| Transport/envelope & endpoint - the flat `EnvelopeIn` is posted to `POST /api/v1/gateway/ingest` (bearer token obtained from `POST /api/v1/gateway/token`), or is a separate `TransportBatch` contract required? | | |
 | Streams - which streams will the gateway send (including any currently deferred by the backend), and what handling is expected for unsupported streams? | | |
 | Payload-hash canonicalization - do gateway and backend agree on the exact canonical form (numeric representation, timestamp strings, quality casing)? | | |
 | Retry semantics - which HTTP statuses are final vs retryable, and the agreed retry/backoff and duplicate-acknowledgement behavior? | | |
