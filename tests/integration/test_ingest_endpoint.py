@@ -457,3 +457,30 @@ async def test_gzip_body_decoded_matches_identity(client, session, enabled):
     r = await c.post(URL, content=body, headers={**_auth(gw), "content-encoding": "gzip"})
     assert r.status_code == 200 and r.json()["status"] == "duplicate", r.text
     assert stub.writes == []
+
+
+# ===================== enabled: S1 end-to-end (raw bucket) counterpart to the S2 happy path =====================
+async def test_happy_path_s1_bess_fast_stored(client, session, enabled, real_influx):
+    # S1 counterpart to test_happy_path_stored (S2). Confirms an S1/bess_fast record routes
+    # through the endpoint to the T1_RAW_90D (raw) bucket, lands in Influx, and the ledger row
+    # goes 'stored'. Uses a LOCAL S1 index (the shared TEST_INDEX is S2-only).
+    c, _ = client; app = enabled
+    gw_influx, bucket = real_influx
+    app.dependency_overrides[get_influx_gateway] = lambda: gw_influx
+    app.dependency_overrides[get_registry_index] = lambda: RegistryIndex.from_rows([
+        ("S1", "bess_fast", "soc", "pcs_1", "Float", "T1_RAW_90D"),
+    ])
+    org, site, gw = await _mk(session, o="o1", s="s1", g="g1", c="c1")
+    now = datetime.now(timezone.utc)
+    env = _env(org, site, gw, stream="S1", substream="bess_fast",
+               records=[_rec("soc", 55.5, asset_id="pcs1", ts=now.isoformat())])
+    try:
+        r = await c.post(URL, json=env, headers=_auth(gw))
+        assert r.status_code == 200, r.text
+        body = r.json()
+        assert body["status"] == "stored" and body["record_count"] == 1
+        res = rows(await gw_influx.latest_by_asset(bucket, "s1_bess_fast", str(site.id), "soc"))
+        assert len(res) == 1 and res[0]["value"] == 55.5
+        assert (await _row(session, env["message_id"])).status == "stored"
+    finally:
+        await _cleanup(gw_influx, bucket, str(site.id), now - timedelta(seconds=60), now + timedelta(seconds=60))
