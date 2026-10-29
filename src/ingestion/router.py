@@ -46,7 +46,7 @@ async def ingest(
     except json.JSONDecodeError:
         raise HTTPException(status.HTTP_400_BAD_REQUEST, "malformed JSON body")
     except (ValidationError, TypeError, ValueError):
-        raise HTTPException(status.HTTP_422_UNPROCESSABLE_ENTITY, "invalid envelope")
+        raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT, "invalid envelope")
 
     # trusted DB-derived scope; client IDs are never trusted for authorization
     identity = await resolve_gateway_identity(session, gw)
@@ -58,7 +58,7 @@ async def ingest(
     if route == "deferred":
         raise HTTPException(status.HTTP_501_NOT_IMPLEMENTED, f"stream {envelope.stream} not supported yet")
     if route != "ingest":
-        raise HTTPException(status.HTTP_422_UNPROCESSABLE_ENTITY, "unsupported stream")
+        raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT, "unsupported stream")
 
     # ---- Phase B: validate + build all points (no ledger, no write) ----
     try:
@@ -68,7 +68,7 @@ async def ingest(
     except UnresolvedMetadata:
         raise HTTPException(status.HTTP_500_INTERNAL_SERVER_ERROR, "registry metadata incomplete")
     except InfluxTelemetryError:
-        raise HTTPException(status.HTTP_422_UNPROCESSABLE_ENTITY, "invalid telemetry record")
+        raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT, "invalid telemetry record")
 
     payload_hash = canonical_hash(envelope.model_dump())
 
