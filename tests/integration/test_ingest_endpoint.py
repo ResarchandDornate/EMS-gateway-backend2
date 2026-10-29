@@ -5,6 +5,8 @@ the registry-index + Influx providers. Real-Influx happy path uses telemetry_tes
 all other states use PG + a stub writer so they are deterministic and need no Influx.
 """
 import types as _types
+import gzip
+import json
 import uuid
 from datetime import datetime, timedelta, timezone
 
@@ -179,6 +181,17 @@ async def test_valid_token_gate_disabled_503_no_downstream_work(client, session,
     r = await c.post(URL, json=_env(org, site, gw), headers=_auth(gw))
     assert r.status_code == 503
     assert await _count(session) == 0          # no ledger claim
+
+
+async def test_disabled_gateway_403_precedes_gate(client, session):
+    # get_current_gateway rejects a disabled gateway (403) before the ingest gate (503, default off).
+    c, _ = client
+    org, site, gw = await _mk(session, o="o1", s="s1", g="g1", c="c1")
+    await session.execute(update(GatewayModel).where(GatewayModel.id == gw.id).values(enabled=False))
+    await session.commit()
+    r = await c.post(URL, json=_env(org, site, gw), headers=_auth(gw))
+    assert r.status_code == 403
+    assert await _count(session) == 0          # rejected at auth; no ledger claim
 
 
 # ===================== enabled: happy path (real Influx, telemetry_test) =====================
@@ -425,3 +438,22 @@ async def test_scope_mismatch_403_precedes_payload_hash(client, session, enabled
     r = await c.post(URL, json=env, headers=_auth(gw))
     assert r.status_code == 403
     assert await _count(session) == 0            # no ledger claim created
+
+
+# ===================== enabled: VALID gzip body decodes like identity =====================
+async def test_gzip_body_decoded_matches_identity(client, session, enabled):
+    # Positive counterpart to test_bad_gzip_400: a valid Content-Encoding: gzip body must
+    # decode to the same envelope and canonical hash as the identity path. Proven via the
+    # ledger duplicate match (same hash -> 200 'duplicate', no write); needs no Influx.
+    c, _ = client; app = enabled
+    stub = _StubInflux(); app.dependency_overrides[get_influx_gateway] = lambda: stub
+    org, site, gw = await _mk(session, o="o1", s="s1", g="g1", c="c1")
+    env = _env(org, site, gw)
+    h = canonical_hash(EnvelopeIn(**env).model_dump())
+    session.add(IngestMessageModel(gateway_id=gw.id, message_id=uuid.UUID(env['message_id']),
+                                   stream="S2", sequence=1, record_count=1, payload_hash=h, status="stored"))
+    await session.commit()
+    body = gzip.compress(json.dumps(env).encode("utf-8"))
+    r = await c.post(URL, content=body, headers={**_auth(gw), "content-encoding": "gzip"})
+    assert r.status_code == 200 and r.json()["status"] == "duplicate", r.text
+    assert stub.writes == []
