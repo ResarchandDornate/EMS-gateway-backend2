@@ -20,8 +20,8 @@ from src.logging import configure_logging
 from src.middleware import RequestContextMiddleware
 from src.ratelimit import init_rate_limiter, shutdown_rate_limiter
 
-# Bound the Influx AND Redis readiness probes so a slow/hung dependency can't stall
-# /ready; the Postgres probe is unchanged in this slice.
+# Bound all three readiness probes (Postgres, Redis, Influx) so a slow/hung
+# dependency can't stall /ready.
 READY_PROBE_TIMEOUT_SECONDS = 3
 
 
@@ -47,10 +47,12 @@ def create_app() -> FastAPI:
     async def ready() -> JSONResponse:
         checks: dict[str, str] = {}
         try:
-            async with engine.connect() as conn:
-                await conn.execute(text("SELECT 1"))
+            async def _probe_postgres():
+                async with engine.connect() as conn:
+                    await conn.execute(text("SELECT 1"))
+            await asyncio.wait_for(_probe_postgres(), timeout=READY_PROBE_TIMEOUT_SECONDS)
             checks["postgres"] = "ok"
-        except Exception as exc:  # noqa: BLE001 - readiness probe reports any failure
+        except Exception as exc:  # noqa: BLE001 - reports any failure, incl. TimeoutError
             checks["postgres"] = f"error: {type(exc).__name__}"
         try:
             client = Redis.from_url(get_settings().redis_url)

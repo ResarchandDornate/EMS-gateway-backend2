@@ -7,10 +7,13 @@ values while using it — check presence/shape only.
 Authoritative source for setting NAMES is `src/config.py` (`Settings`). Values come from the
 environment / `.env`; this file lists **names only**.
 
-> **Inconsistency to reconcile first:** the committed `.env.example` uses `POSTGRES_DSN`,
-> `APP_ENV`, and a single `INFLUX_BUCKET`, which do **not** match the current `Settings` fields
-> (`database_url`, `env`, and the two buckets `influx_bucket_raw` / `influx_bucket_long`).
-> Confirm which names the deployment actually provides before relying on either. Do not assume.
+> **Template aligned with `Settings`:** `.env.example` has been updated to use the env-var
+> names the code actually reads — `DATABASE_URL`, `ENV`, and the two buckets
+> `INFLUX_BUCKET_RAW` / `INFLUX_BUCKET_LONG` — matching the field names in `src/config.py`
+> (it previously used `POSTGRES_DSN`, `APP_ENV`, and a single `INFLUX_BUCKET`, which
+> `Settings` ignores under `extra="ignore"`). This does **not** verify the live deployment:
+> confirm the environment variables the deployment actually provides against `src/config.py`
+> before relying on them. Do not assume.
 
 ## 1. Required settings (no default in `Settings` — must be present)
 - [ ] `DATABASE_URL` (field `database_url`) — PostgreSQL DSN

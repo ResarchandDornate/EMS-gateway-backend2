@@ -69,6 +69,14 @@ class Settings(BaseSettings):
     otp_challenge_cleanup_enabled: bool = False        # default OFF -> no behavior change
     otp_challenge_retention_seconds: int = 86400       # must be >= otp_verify_cap_window_seconds
 
+    @field_validator("otp_provider")
+    @classmethod
+    def _otp_provider_known(cls, v):
+        allowed = {"mock", "msg91"}
+        if v not in allowed:
+            raise ValueError(f"otp_provider must be one of {sorted(allowed)}")
+        return v
+
     @field_validator("influx_bucket_3y")
     @classmethod
     def _influx_bucket_3y_nonblank(cls, v: str) -> str:
