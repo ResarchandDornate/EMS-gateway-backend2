@@ -33,7 +33,7 @@ from sqlalchemy import select, update
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 
 from src.ingestion.models import IngestMessageModel
-from src.streams import DEFERRED_STREAMS, INGEST_STREAMS
+from src.streams import DEFERRED_STREAMS, INGEST_STREAMS, STRUCTURED_STREAMS
 
 LEASE_TTL_SECONDS = 60     # must exceed p99 end-to-end single-message write latency
 
@@ -49,6 +49,8 @@ class IngestDecision(str, Enum):
 def route_stream(stream: str) -> str:
     if stream in INGEST_STREAMS:
         return "ingest"
+    if stream in STRUCTURED_STREAMS:
+        return "structured"
     if stream in DEFERRED_STREAMS:
         return "deferred"
     return "unknown"

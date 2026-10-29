@@ -21,6 +21,16 @@ from src.ingestion.models import IngestMessageModel
 from src.ingestion.providers import (get_influx_gateway, get_registry_index,
                                       reset_registry_cache)
 from src.ingestion.schemas import EnvelopeIn
+from src.ingestion.s3_health import S3HealthEnvelopeIn
+from src.ingestion.health_models import GatewayHealthRecordModel
+from src.ingestion.s4_alarms import S4AlarmEnvelopeIn
+from src.ingestion.alarm_models import AlarmEventRecordModel
+from src.ingestion.controller_models import ControllerStateRecordModel
+from src.ingestion.solis_models import SolisTelemetryRecordModel
+from src.ingestion.edge_ai_models import EdgeAiInferenceRecordModel
+from src.ingestion.config_audit_models import ConfigurationAuditRecordModel
+from src.ingestion.s8_config_audit import S8ConfigAuditEnvelopeIn
+from src.ingestion.command_result_models import CommandResultRecordModel
 from src.ingestion.service import canonical_hash
 from src.tenancy.gateways.models import GatewayModel
 from src.tenancy.organizations.models import OrganizationModel
@@ -484,3 +494,422 @@ async def test_happy_path_s1_bess_fast_stored(client, session, enabled, real_inf
         assert (await _row(session, env["message_id"])).status == "stored"
     finally:
         await _cleanup(gw_influx, bucket, str(site.id), now - timedelta(seconds=60), now + timedelta(seconds=60))
+
+
+# ===================== S3 structured-record endpoint (gateway_health -> JSONB) =====================
+_S3_REC = {
+    "status": "ok", "timestamp_utc": "2026-09-04T08:00:00.340928+00:00",
+    "gateway_mode": "ems_read_write", "source_count": 2, "asset_count": 18,
+    "online_asset_count": 18, "total_signal_count": 2844, "bad_signal_count": 0,
+    "commands_enabled": True, "control_enabled": True, "storage_can_write": True,
+    "storage": {"enabled": True, "type": "sqlite", "path": None, "reasons": []},
+}
+
+
+def _s3env(org, site, gw, *, records=None, message_id=None):
+    recs = records if records is not None else [dict(_S3_REC)]
+    return {"schema_version": "1.0", "message_id": str(message_id or uuid.uuid4()),
+            "gateway_id": str(gw.id), "site_id": str(site.id), "organization_id": str(org.id),
+            "stream": "S3", "substream": "gateway", "sequence": 1,
+            "created_at_utc": "2026-09-04T08:00:00+00:00", "record_count": len(recs), "records": recs}
+
+
+async def _health_count(session):
+    return (await session.execute(select(func.count()).select_from(GatewayHealthRecordModel))).scalar()
+
+
+async def test_s3_gate_disabled_503(client, session):
+    c, _ = client
+    org, site, gw = await _mk(session, o="o1", s="s1", g="g1", c="c1")
+    r = await c.post(URL, json=_s3env(org, site, gw), headers=_auth(gw))
+    assert r.status_code == 503
+    assert await _count(session) == 0 and await _health_count(session) == 0
+
+
+async def test_s3_disabled_gateway_403(client, session):
+    c, _ = client
+    org, site, gw = await _mk(session, o="o1", s="s1", g="g1", c="c1")
+    await session.execute(update(GatewayModel).where(GatewayModel.id == gw.id).values(enabled=False))
+    await session.commit()
+    r = await c.post(URL, json=_s3env(org, site, gw), headers=_auth(gw))
+    assert r.status_code == 403
+    assert await _count(session) == 0 and await _health_count(session) == 0
+
+
+async def test_s3_valid_stored_200(client, session, enabled):
+    c, _ = client; app = enabled
+    app.dependency_overrides[get_influx_gateway] = lambda: _StubInflux()
+    org, site, gw = await _mk(session, o="o1", s="s1", g="g1", c="c1")
+    env = _s3env(org, site, gw)
+    r = await c.post(URL, json=env, headers=_auth(gw))
+    assert r.status_code == 200, r.text
+    body = r.json()
+    assert body["status"] == "stored" and body["record_count"] == 1
+    assert (await _row(session, env["message_id"])).status == "stored"
+    assert await _health_count(session) == 1
+
+
+async def test_s3_duplicate_200(client, session, enabled):
+    c, _ = client; app = enabled
+    app.dependency_overrides[get_influx_gateway] = lambda: _StubInflux()
+    org, site, gw = await _mk(session, o="o1", s="s1", g="g1", c="c1")
+    env = _s3env(org, site, gw)
+    h = canonical_hash(S3HealthEnvelopeIn(**env).model_dump(mode="json"))
+    session.add(IngestMessageModel(gateway_id=gw.id, message_id=uuid.UUID(env["message_id"]),
+                                   stream="S3", sequence=1, record_count=1, payload_hash=h, status="stored"))
+    await session.commit()
+    r = await c.post(URL, json=env, headers=_auth(gw))
+    assert r.status_code == 200 and r.json()["status"] == "duplicate"
+    assert await _health_count(session) == 0          # duplicate -> no new JSONB write
+
+
+async def test_s3_hash_mismatch_409(client, session, enabled):
+    c, _ = client; app = enabled
+    app.dependency_overrides[get_influx_gateway] = lambda: _StubInflux()
+    org, site, gw = await _mk(session, o="o1", s="s1", g="g1", c="c1")
+    env = _s3env(org, site, gw)
+    session.add(IngestMessageModel(gateway_id=gw.id, message_id=uuid.UUID(env["message_id"]),
+                                   stream="S3", sequence=1, record_count=1, payload_hash="DIFFERENT", status="stored"))
+    await session.commit()
+    r = await c.post(URL, json=env, headers=_auth(gw))
+    assert r.status_code == 409
+    assert await _health_count(session) == 0
+
+
+async def test_s3_scope_mismatch_403(client, session, enabled):
+    c, _ = client; app = enabled
+    app.dependency_overrides[get_influx_gateway] = lambda: _StubInflux()
+    org, site, gw = await _mk(session, o="o1", s="s1", g="g1", c="c1")
+    env = _s3env(org, site, gw); env["organization_id"] = str(uuid.uuid4())
+    r = await c.post(URL, json=env, headers=_auth(gw))
+    assert r.status_code == 403
+    assert await _count(session) == 0 and await _health_count(session) == 0
+
+
+async def test_s3_malformed_422_no_claim(client, session, enabled):
+    c, _ = client; app = enabled
+    app.dependency_overrides[get_influx_gateway] = lambda: _StubInflux()
+    org, site, gw = await _mk(session, o="o1", s="s1", g="g1", c="c1")
+    bad = dict(_S3_REC); bad.pop("status")                  # missing required scalar -> fail before claim
+    env = _s3env(org, site, gw, records=[bad])
+    r = await c.post(URL, json=env, headers=_auth(gw))
+    assert r.status_code == 422
+    assert await _count(session) == 0 and await _health_count(session) == 0
+
+
+# ===================== S4 alarms/events endpoint (events -> JSONB) =====================
+def _s4rec(**over):
+    r = {"event_id": str(uuid.uuid4()), "timestamp_utc": "2026-09-04T08:00:00.5+00:00",
+         "gateway_id": "g1", "site_id": "s1", "source_id": "external_ems_1",
+         "event_type": "BMS_CELL_OVERVOLTAGE_ACTIVE", "severity": "Critical", "state": "ACTIVE",
+         "message": "Cell overvoltage", "dedupe_key": "bms1:overvoltage"}
+    r.update(over); return r
+
+
+def _s4env(org, site, gw, *, records=None, message_id=None):
+    recs = records if records is not None else [_s4rec()]
+    return {"schema_version": "1.0", "message_id": str(message_id or uuid.uuid4()),
+            "gateway_id": str(gw.id), "site_id": str(site.id), "organization_id": str(org.id),
+            "stream": "S4", "substream": "events", "sequence": 1,
+            "created_at_utc": "2026-09-04T08:00:00+00:00", "record_count": len(recs), "records": recs}
+
+
+async def _alarm_count(session):
+    return (await session.execute(select(func.count()).select_from(AlarmEventRecordModel))).scalar()
+
+
+async def test_s4_gate_disabled_503(client, session):
+    c, _ = client
+    org, site, gw = await _mk(session, o="o1", s="s1", g="g1", c="c1")
+    r = await c.post(URL, json=_s4env(org, site, gw), headers=_auth(gw))
+    assert r.status_code == 503
+    assert await _count(session) == 0 and await _alarm_count(session) == 0
+
+
+async def test_s4_disabled_gateway_403(client, session):
+    c, _ = client
+    org, site, gw = await _mk(session, o="o1", s="s1", g="g1", c="c1")
+    await session.execute(update(GatewayModel).where(GatewayModel.id == gw.id).values(enabled=False))
+    await session.commit()
+    r = await c.post(URL, json=_s4env(org, site, gw), headers=_auth(gw))
+    assert r.status_code == 403
+    assert await _count(session) == 0 and await _alarm_count(session) == 0
+
+
+async def test_s4_valid_stored_200(client, session, enabled):
+    c, _ = client; app = enabled
+    app.dependency_overrides[get_influx_gateway] = lambda: _StubInflux()
+    org, site, gw = await _mk(session, o="o1", s="s1", g="g1", c="c1")
+    env = _s4env(org, site, gw)
+    r = await c.post(URL, json=env, headers=_auth(gw))
+    assert r.status_code == 200, r.text
+    assert r.json()["status"] == "stored" and r.json()["record_count"] == 1
+    assert (await _row(session, env["message_id"])).status == "stored"
+    assert await _alarm_count(session) == 1
+
+
+async def test_s4_duplicate_200(client, session, enabled):
+    c, _ = client; app = enabled
+    app.dependency_overrides[get_influx_gateway] = lambda: _StubInflux()
+    org, site, gw = await _mk(session, o="o1", s="s1", g="g1", c="c1")
+    env = _s4env(org, site, gw)
+    h = canonical_hash(S4AlarmEnvelopeIn(**env).model_dump(mode="json"))
+    session.add(IngestMessageModel(gateway_id=gw.id, message_id=uuid.UUID(env["message_id"]),
+                                   stream="S4", sequence=1, record_count=1, payload_hash=h, status="stored"))
+    await session.commit()
+    r = await c.post(URL, json=env, headers=_auth(gw))
+    assert r.status_code == 200 and r.json()["status"] == "duplicate"
+    assert await _alarm_count(session) == 0          # duplicate -> no JSONB write
+
+
+async def test_s4_hash_mismatch_409(client, session, enabled):
+    c, _ = client; app = enabled
+    app.dependency_overrides[get_influx_gateway] = lambda: _StubInflux()
+    org, site, gw = await _mk(session, o="o1", s="s1", g="g1", c="c1")
+    env = _s4env(org, site, gw)
+    session.add(IngestMessageModel(gateway_id=gw.id, message_id=uuid.UUID(env["message_id"]),
+                                   stream="S4", sequence=1, record_count=1, payload_hash="DIFFERENT", status="stored"))
+    await session.commit()
+    r = await c.post(URL, json=env, headers=_auth(gw))
+    assert r.status_code == 409
+    assert await _alarm_count(session) == 0
+
+
+async def test_s4_scope_mismatch_403(client, session, enabled):
+    c, _ = client; app = enabled
+    app.dependency_overrides[get_influx_gateway] = lambda: _StubInflux()
+    org, site, gw = await _mk(session, o="o1", s="s1", g="g1", c="c1")
+    env = _s4env(org, site, gw); env["organization_id"] = str(uuid.uuid4())
+    r = await c.post(URL, json=env, headers=_auth(gw))
+    assert r.status_code == 403
+    assert await _count(session) == 0 and await _alarm_count(session) == 0
+
+
+async def test_s4_malformed_422_no_claim(client, session, enabled):
+    c, _ = client; app = enabled
+    app.dependency_overrides[get_influx_gateway] = lambda: _StubInflux()
+    org, site, gw = await _mk(session, o="o1", s="s1", g="g1", c="c1")
+    bad = _s4rec(); bad.pop("severity")                     # missing required enum -> fail before claim
+    env = _s4env(org, site, gw, records=[bad])
+    r = await c.post(URL, json=env, headers=_auth(gw))
+    assert r.status_code == 422
+    assert await _count(session) == 0 and await _alarm_count(session) == 0
+
+
+# ===================== S5 remains DEFERRED (controller_state slice not wired to endpoint) =====================
+def _s5env(org, site, gw, *, message_id=None):
+    return {"schema_version": "1.0", "message_id": str(message_id or uuid.uuid4()),
+            "gateway_id": str(gw.id), "site_id": str(site.id), "organization_id": str(org.id),
+            "stream": "S5", "substream": "controller", "sequence": 1,
+            "created_at_utc": "2026-09-04T08:00:00+00:00", "record_count": 1,
+            "records": [{"timestamp_utc": "2026-09-04T08:00:05+00:00", "mode": "LIVE",
+                         "healthy": True, "controller": {"state": "NORMAL"}}]}
+
+
+async def _controller_count(session):
+    return (await session.execute(select(func.count()).select_from(ControllerStateRecordModel))).scalar()
+
+
+async def test_s5_deferred_501_no_write(client, session, enabled):
+    # S5 persistence exists at the service layer but is NOT routed: endpoint must still 501,
+    # with no ledger claim and no controller_state row.
+    c, _ = client; app = enabled
+    app.dependency_overrides[get_influx_gateway] = lambda: _StubInflux()
+    org, site, gw = await _mk(session, o="o1", s="s1", g="g1", c="c1")
+    r = await c.post(URL, json=_s5env(org, site, gw), headers=_auth(gw))
+    assert r.status_code == 501
+    assert await _count(session) == 0 and await _controller_count(session) == 0
+
+
+# ===================== S6 remains DEFERRED (solis_telemetry slice not wired to endpoint) =====================
+def _s6env(org, site, gw, *, message_id=None):
+    return {"schema_version": "1.0", "message_id": str(message_id or uuid.uuid4()),
+            "gateway_id": str(gw.id), "site_id": str(site.id), "organization_id": str(org.id),
+            "stream": "S6", "substream": "solis", "sequence": 1,
+            "created_at_utc": "2026-09-04T08:00:00+00:00", "record_count": 1,
+            "records": [{"timestamp_utc": "2026-09-04T08:00:15+00:00",
+                         "solis": {"online": True, "state": "ON", "power_mode": "DERATED"}}]}
+
+
+async def _solis_count(session):
+    return (await session.execute(select(func.count()).select_from(SolisTelemetryRecordModel))).scalar()
+
+
+async def test_s6_deferred_501_no_write(client, session, enabled):
+    # S6 persistence exists at the service layer but is NOT routed: endpoint must still 501,
+    # with no ledger claim and no solis_telemetry row.
+    c, _ = client; app = enabled
+    app.dependency_overrides[get_influx_gateway] = lambda: _StubInflux()
+    org, site, gw = await _mk(session, o="o1", s="s1", g="g1", c="c1")
+    r = await c.post(URL, json=_s6env(org, site, gw), headers=_auth(gw))
+    assert r.status_code == 501
+    assert await _count(session) == 0 and await _solis_count(session) == 0
+
+
+# ===================== S7 remains DEFERRED (edge_ai_inference slice not wired to endpoint) =====================
+def _s7env(org, site, gw, *, message_id=None):
+    return {"schema_version": "1.0", "message_id": str(message_id or uuid.uuid4()),
+            "gateway_id": str(gw.id), "site_id": str(site.id), "organization_id": str(org.id),
+            "stream": "S7", "substream": "per_bess", "sequence": 1,
+            "created_at_utc": "2026-09-28T04:58:23+00:00", "record_count": 1,
+            "records": [{"phase": "8", "cycle_time": "2026-09-28T04:58:23+00:00", "cycle_index": 14533,
+                         "model_info": {"model_type": "IsolationForest", "feature_count": 33}}]}
+
+
+async def _edge_ai_count(session):
+    return (await session.execute(select(func.count()).select_from(EdgeAiInferenceRecordModel))).scalar()
+
+
+async def test_s7_deferred_501_no_write(client, session, enabled):
+    # S7 persistence exists at the service layer but is NOT routed: endpoint must still 501,
+    # with no ledger claim and no edge_ai_inference row.
+    c, _ = client; app = enabled
+    app.dependency_overrides[get_influx_gateway] = lambda: _StubInflux()
+    org, site, gw = await _mk(session, o="o1", s="s1", g="g1", c="c1")
+    r = await c.post(URL, json=_s7env(org, site, gw), headers=_auth(gw))
+    assert r.status_code == 501
+    assert await _count(session) == 0 and await _edge_ai_count(session) == 0
+
+
+# ===================== S8 configuration_audit endpoint (ACTIVE -> JSONB) =====================
+def _s8rec(**over):
+    r = {"audit_id": str(uuid.uuid4()), "timestamp_utc": "2026-10-12T04:21:09.512000+00:00",
+         "gateway_id": "g1", "site_id": "s1", "actor": "kedar@ornatesolar.com",
+         "actor_role": "admin", "change_source": "central_command",
+         "setting_path": "controller.high_limit", "old_value": 85, "new_value": 90,
+         "revision": 42, "reason": "raised ceiling", "correlation_id": "cmd-7781"}
+    r.update(over); return r
+
+
+def _s8env(org, site, gw, *, records=None, message_id=None):
+    recs = records if records is not None else [_s8rec()]
+    return {"schema_version": "1.0", "message_id": str(message_id or uuid.uuid4()),
+            "gateway_id": str(gw.id), "site_id": str(site.id), "organization_id": str(org.id),
+            "stream": "S8", "substream": "config_audit", "sequence": 1,
+            "created_at_utc": "2026-10-12T04:21:09+00:00", "record_count": len(recs), "records": recs}
+
+
+async def _audit_count(session):
+    return (await session.execute(select(func.count()).select_from(ConfigurationAuditRecordModel))).scalar()
+
+
+async def test_s8_gate_disabled_503(client, session):
+    c, _ = client
+    org, site, gw = await _mk(session, o="o1", s="s1", g="g1", c="c1")
+    r = await c.post(URL, json=_s8env(org, site, gw), headers=_auth(gw))
+    assert r.status_code == 503
+    assert await _count(session) == 0 and await _audit_count(session) == 0
+
+
+async def test_s8_disabled_gateway_403(client, session):
+    c, _ = client
+    org, site, gw = await _mk(session, o="o1", s="s1", g="g1", c="c1")
+    await session.execute(update(GatewayModel).where(GatewayModel.id == gw.id).values(enabled=False))
+    await session.commit()
+    r = await c.post(URL, json=_s8env(org, site, gw), headers=_auth(gw))
+    assert r.status_code == 403
+    assert await _count(session) == 0 and await _audit_count(session) == 0
+
+
+async def test_s8_valid_stored_200(client, session, enabled):
+    c, _ = client; app = enabled
+    app.dependency_overrides[get_influx_gateway] = lambda: _StubInflux()
+    org, site, gw = await _mk(session, o="o1", s="s1", g="g1", c="c1")
+    env = _s8env(org, site, gw)
+    r = await c.post(URL, json=env, headers=_auth(gw))
+    assert r.status_code == 200, r.text
+    assert r.json()["status"] == "stored" and r.json()["record_count"] == 1
+    assert (await _row(session, env["message_id"])).status == "stored"
+    assert await _audit_count(session) == 1
+
+
+async def test_s8_duplicate_200(client, session, enabled):
+    c, _ = client; app = enabled
+    app.dependency_overrides[get_influx_gateway] = lambda: _StubInflux()
+    org, site, gw = await _mk(session, o="o1", s="s1", g="g1", c="c1")
+    env = _s8env(org, site, gw)
+    h = canonical_hash(S8ConfigAuditEnvelopeIn(**env).model_dump(mode="json"))
+    session.add(IngestMessageModel(gateway_id=gw.id, message_id=uuid.UUID(env["message_id"]),
+                                   stream="S8", sequence=1, record_count=1, payload_hash=h, status="stored"))
+    await session.commit()
+    r = await c.post(URL, json=env, headers=_auth(gw))
+    assert r.status_code == 200 and r.json()["status"] == "duplicate"
+    assert await _audit_count(session) == 0          # duplicate -> no JSONB write
+
+
+async def test_s8_hash_mismatch_409(client, session, enabled):
+    c, _ = client; app = enabled
+    app.dependency_overrides[get_influx_gateway] = lambda: _StubInflux()
+    org, site, gw = await _mk(session, o="o1", s="s1", g="g1", c="c1")
+    env = _s8env(org, site, gw)
+    session.add(IngestMessageModel(gateway_id=gw.id, message_id=uuid.UUID(env["message_id"]),
+                                   stream="S8", sequence=1, record_count=1, payload_hash="DIFFERENT", status="stored"))
+    await session.commit()
+    r = await c.post(URL, json=env, headers=_auth(gw))
+    assert r.status_code == 409
+    assert await _audit_count(session) == 0
+
+
+async def test_s8_scope_mismatch_403(client, session, enabled):
+    c, _ = client; app = enabled
+    app.dependency_overrides[get_influx_gateway] = lambda: _StubInflux()
+    org, site, gw = await _mk(session, o="o1", s="s1", g="g1", c="c1")
+    env = _s8env(org, site, gw); env["organization_id"] = str(uuid.uuid4())
+    r = await c.post(URL, json=env, headers=_auth(gw))
+    assert r.status_code == 403
+    assert await _count(session) == 0 and await _audit_count(session) == 0
+
+
+async def test_s8_malformed_enum_422_no_claim(client, session, enabled):
+    c, _ = client; app = enabled
+    app.dependency_overrides[get_influx_gateway] = lambda: _StubInflux()
+    org, site, gw = await _mk(session, o="o1", s="s1", g="g1", c="c1")
+    env = _s8env(org, site, gw, records=[_s8rec(change_source="model_update")])  # Option A reject
+    r = await c.post(URL, json=env, headers=_auth(gw))
+    assert r.status_code == 422
+    assert await _count(session) == 0 and await _audit_count(session) == 0
+
+
+async def test_s8_persistence_failure_503(client, session, enabled, monkeypatch):
+    # Write failure after validation+claim -> 503; no audit row persisted (message left retryable).
+    c, _ = client; app = enabled
+    app.dependency_overrides[get_influx_gateway] = lambda: _StubInflux()
+    import src.ingestion.config_audit_service as CAS
+
+    async def _boom(*a, **k):
+        raise RuntimeError("db down")
+
+    monkeypatch.setattr(CAS, "_upsert_rows", _boom)
+    org, site, gw = await _mk(session, o="o1", s="s1", g="g1", c="c1")
+    r = await c.post(URL, json=_s8env(org, site, gw), headers=_auth(gw))
+    assert r.status_code == 503
+    assert await _audit_count(session) == 0
+
+
+# ===================== S9 remains DEFERRED (command_results slice not wired to endpoint) =====================
+def _s9env(org, site, gw, *, message_id=None):
+    return {"schema_version": "1.0", "message_id": str(message_id or uuid.uuid4()),
+            "gateway_id": str(gw.id), "site_id": str(site.id), "organization_id": str(org.id),
+            "stream": "S9", "substream": "commands", "sequence": 1,
+            "created_at_utc": "2026-10-12T04:21:09+00:00", "record_count": 1,
+            "records": [{"command_id": str(uuid.uuid4()), "gateway_id": "g1", "site_id": "s1",
+                         "requested_at_utc": "2026-10-12T04:21:09+00:00",
+                         "received_at_utc": "2026-10-12T04:21:10+00:00",
+                         "requested_by": "u", "requested_role": "admin", "command_type": "noop",
+                         "requested_value": {}, "gateway_validation_ok": True,
+                         "readback_requested": False, "verified": None, "final_status": "accepted"}]}
+
+
+async def _command_result_count(session):
+    return (await session.execute(select(func.count()).select_from(CommandResultRecordModel))).scalar()
+
+
+async def test_s9_deferred_501_no_write(client, session, enabled):
+    # S9 persistence exists at the service layer but is NOT routed: endpoint must still 501,
+    # with no ledger claim and no command_result row.
+    c, _ = client; app = enabled
+    app.dependency_overrides[get_influx_gateway] = lambda: _StubInflux()
+    org, site, gw = await _mk(session, o="o1", s="s1", g="g1", c="c1")
+    r = await c.post(URL, json=_s9env(org, site, gw), headers=_auth(gw))
+    assert r.status_code == 501
+    assert await _count(session) == 0 and await _command_result_count(session) == 0
