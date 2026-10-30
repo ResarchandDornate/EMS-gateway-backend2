@@ -21,12 +21,21 @@ async def create_organization(
     user=Depends(require_permission("org:manage")),
     session: AsyncSession = Depends(get_session),
 ):
+    # intra-request duplicate site keys (already normalized by the schema) -> 409,
+    # rejected BEFORE any write (no partial rows). We reject rather than drop a site.
+    site_keys = [s.site_key for s in data.sites]
+    if len(site_keys) != len(set(site_keys)):
+        raise HTTPException(status_code=409, detail="Duplicate site key in request")
+
     if await service.org_key_exists(session, data.org_key):
         raise HTTPException(status_code=409, detail="Organization key already exists")
     if await service.phone_exists(session, data.admin_phone):
         raise HTTPException(status_code=409, detail="Phone number already registered")
 
-    org, admin, sites = await service.create_client(session, user.id, data)
+    try:
+        org, admin, sites = await service.create_client(session, user.id, data)
+    except service.ConflictError as e:               # unique violation that raced the pre-check
+        raise HTTPException(status_code=409, detail=e.detail)
 
     return OrganizationOut(
         id=org.id,

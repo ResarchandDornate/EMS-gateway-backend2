@@ -2,10 +2,9 @@ import uuid
 
 from pydantic import BaseModel, Field, field_validator, model_validator
 
+from src.streams import KNOWN_STREAMS
+
 SUPPORTED_SCHEMA_VERSIONS = {"1.0"}
-INGEST_STREAMS = {"S1", "S2"}
-DEFERRED_STREAMS = {"S3", "S4", "S5", "S6", "S7", "S8", "S9", "D1"}
-KNOWN_STREAMS = INGEST_STREAMS | DEFERRED_STREAMS
 MAX_RECORDS = 10_000
 MAX_SEQUENCE = 2**63 - 1          # fits BigInteger column
 

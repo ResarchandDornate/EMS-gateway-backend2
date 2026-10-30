@@ -2,6 +2,7 @@
 
 **Status:** Draft for gateway/EMS team confirmation
 **Prepared:** 2026-10-25
+**Reviewed:** 2026-10-28 (aligned to current implementation and tests)
 **Scope:** `POST /api/v1/gateway/ingest` (Northbound telemetry ingestion, streams S1 & S2)
 **Current state:** The ingestion endpoint is implemented and tested but **disabled by default**
 (`ingest_enabled = false`); it authenticates the gateway and returns **HTTP 503** until the
@@ -53,6 +54,18 @@ at the end.
 
 ---
 
+## Transport envelope (CONFIRM)
+
+The backend currently accepts the **flat `EnvelopeIn`** described above - a single JSON object
+with top-level `records` - posted to `POST /api/v1/gateway/ingest` using a bearer token obtained
+from `POST /api/v1/gateway/token`. A separate `TransportBatch` envelope is **not** implemented.
+
+**Please confirm:** will the gateway send the flat `EnvelopeIn` above, or is a distinct
+`TransportBatch` envelope (e.g. one wrapping multiple messages) required? If the latter, please
+provide its exact field layout so both sides align before ingestion is enabled.
+
+---
+
 ## Target gateway, scope & cadence (CONFIRM cadence)
 
 **Target gateway:** this contract covers the **Kalpa S2 northbound gateway**. The authoritative
@@ -95,7 +108,7 @@ If utility-meter data is in scope for this gateway, it must be defined and added
 | `source_id` | string (≤128) | required | Tag; identifies the data source |
 | `asset_id` | string (≤128) | required | Tag; identifies the asset (e.g. rack/bank/PCS) |
 | `signal_key` | string (≤128) | required | Must exist in the registry for that substream |
-| `value` | number (float/int) | required (non-null) | Schema accepts number/string/bool/null, but the backend **coerces to the registry's numeric type and rejects (HTTP 422) any non-numeric or null value** for all current signals. See B1 Q3. |
+| `value` | number (float/int) | required (non-null) | Schema accepts number/string/bool/null. The backend coerces each value to the registry `data_type` and **rejects (HTTP 422) any non-numeric, null, or boolean value**. Every registry `data_type` is numeric (`U16`/`S16`/`U32`/`FLOAT32`/`Float`); `system_alarm`/`system_data` are **category** labels (not data types) whose signals carry numeric data types, so they ingest as numbers today. See B1 Q3. |
 | `quality` | string or null (≤32) | optional | Backend accepts only `good`/`stale`/`offline`/`error` (case-insensitive) or null; any other value is rejected (HTTP 422). See B1 Q5. |
 | `timestamp` | string | required | See B2 |
 
@@ -104,11 +117,14 @@ If utility-meter data is in scope for this gateway, it must be defined and added
 2. A **representative real JSON envelope + records** example (one S1 `bess_fast` and one S2
    `bms_extended` message), including field types, which fields are required vs optional, and
    nullability.
-3. `value` encoding: **the backend currently rejects (HTTP 422) any non-numeric or null
-   value**, because every signal in the registry is numeric. Please confirm whether any
-   signals — especially **state / status / enumerated / alarm** signals — are sent as strings,
-   booleans, or null. If so, we must agree on an encoding (e.g. numeric codes) before enabling
-   ingestion; we will not silently narrow or widen the contract.
+3. `value` encoding: the backend coerces each value to the registry `data_type` and **rejects
+   (HTTP 422) any non-numeric, null, or boolean value**. Every registry `data_type` is numeric
+   (`U16`/`S16`/`U32`/`FLOAT32`/`Float`); `system_alarm`/`system_data` are **category** labels, not
+   data types, and those signals carry numeric data types, so they ingest as numbers today. Please
+   confirm the wire representation for **state / status / enumerated / alarm** signals — are they
+   sent as numeric codes (matching the registry type), or as strings / booleans / null? If any are
+   non-numeric we must agree an encoding (e.g. numeric codes) before enabling; we will not silently
+   narrow or widen the contract.
 4. That the `gateway_id`/`site_id`/`organization_id` the gateway will send are the registered
    UUIDs (so the 403 scope check passes).
 5. `quality` values: the backend accepts only `good`/`stale`/`offline`/`error` (or null).
@@ -137,15 +153,49 @@ message idempotency hash, not as the point time).
 
 ---
 
+## Payload-hash canonicalization (CONFIRM)
+
+For idempotency the backend computes a SHA-256 over a canonical JSON of **only** the
+telemetry-bearing fields, in sorted-key order with no whitespace. It **includes exactly**:
+`schema_version`, `stream`, `substream`, `sequence`, `created_at_utc`, `record_count`, and
+`records`; it **excludes** `message_id`, `gateway_id`, `site_id`, `organization_id`,
+`compression`, and `gateway_software_version`. The hash is computed over the parsed values, so
+numeric representation (`1` vs `1.0`), timestamp string form (`Z` vs `+00:00`), and `quality`
+casing are currently **significant** - no normalization is applied.
+
+**Please confirm:** that the gateway's notion of a "same payload" retry matches this field set
+and canonical form - in particular, that a retried message reproduces identical
+numeric/timestamp/quality encodings. If the gateway canonicalizes differently, we should agree
+the rule before enabling ingestion so legitimate retries are not misclassified as a changed
+payload (HTTP 409).
+
+---
+
 ## T3 — Long-retention (3-year) signals (CONFIRM)
 
-Our registry classifies these **12** signals as `T3_3Y`. There is **no 3-year retention
-bucket configured** today — only two buckets exist: `telemetry_raw_90d` (S1) and `telemetry_1y`
-(S2). Their **90-day / 365-day durations are development/configuration values** (from
-`docker-compose.yml`) and are **not an independently verified production retention guarantee**;
-the deployed InfluxDB instance's actual retention policies must be verified separately. These
-12 signals therefore **fail closed**: a message containing any of them is currently rejected
-with **HTTP 501** and nothing is stored. We will **not** invent a bucket or reroute them.
+Our registry classifies these **12** signals as `T3_3Y`.
+
+(a) **Implemented backend routing (source-verified):** the backend routes `T3_3Y` to a dedicated
+3-year bucket, **`telemetry_3y`** (`src/config.py`), and such messages are **accepted and written**
+when ingestion is enabled. Fail-closed behavior (-> HTTP 501) applies **only** when that bucket is
+missing/blank, not on the normal path. This code path is exercised by the test
+`test_t3_stored_200` - that is **test evidence for the code path only**, not proof of production
+behavior or of any deployed retention guarantee.
+
+(b) **Configured / proposed retention (NOT approved):** the T3 bucket's retention is a configured
+value of **1095 days** (`influx_bucket_3y_retention_seconds`, default 94,608,000 s), explicitly
+**proposed and not production-approved**. It is checked against the configured seconds only at
+provisioning time (`src/influx_provision.py`).
+
+(c) **Deployed InfluxDB policy (UNVERIFIED):** the actual retention policy enforced on the deployed
+InfluxDB instance has **not** been independently verified and must be confirmed separately. The
+S1/S2 `telemetry_raw_90d` / `telemetry_1y` durations are likewise development `docker-compose.yml`
+values, not verified production guarantees.
+
+Because (b) and (c) are unresolved, a configured T3 bucket **does not make enabling ingestion
+safe** - it only means T3 data would be written to a bucket whose production retention is neither
+approved nor verified. We will **not** represent any of these as production-approved, and we will
+**not** invent a bucket or reroute signals.
 
 | # | Stream/Substream | `signal_key` | asset_type | type | unit |
 |---|---|---|---|---|---|
@@ -162,11 +212,12 @@ with **HTTP 501** and nothing is stored. We will **not** invent a bucket or rero
 | 11 | S2/bms_extended | `rack_accumulated_charge_energy` | rack | FLOAT32 | kWh |
 | 12 | S2/bms_extended | `rack_accumulated_discharge_energy` | rack | FLOAT32 | kWh |
 
-**Please confirm ONE of:**
-- (a) The intended **3-year retention bucket/policy** for these signals and **when** the
-  gateway will start transmitting them; or
-- (b) That gateways will **not** send these 12 signals in current S1/S2 batches until a
-  retention policy is approved (so they do not trigger 501 rejections).
+**Please confirm:**
+- (a) The **production-approved 3-year retention policy** (duration and bucket) for these 12
+  signals, and confirmation that the **deployed InfluxDB** retention matches it (today the
+  1095-day value is configured/proposed only, and the deployed policy is unverified); and
+- (b) **When** the gateway will begin transmitting these signals, so retention is approved and
+  verified before sustained 3-year data accumulates.
 
 ---
 
@@ -176,7 +227,7 @@ Overall-BESS SoC and per-rack SoC are **currently unresolved** in our source (bo
 are explicitly unset; we do not guess, duplicate across racks, or average rack values to
 fabricate an overall figure). Note: an S1 `bess_fast` signal named `soc` exists (asset_type
 `pcs_1`), but it has **not** been confirmed as the authoritative overall-BESS or per-rack SoC.
-The only SoC signals in the S2 `ems_system` substream are `system_max_rack_soc` and
+There is no single `system_soc` field in the registry; the only SoC signals in the S2 `ems_system` substream are `system_max_rack_soc` and
 `system_min_rack_soc` (bank, %, T2_1Y) — **neither is an authoritative overall-BESS SoC**, and
 the registry contains **no whole-rack SoC** signal (rack level has only cell-level and max/min
 aggregates).
@@ -193,8 +244,11 @@ aggregates).
 
 ## Rate limiting (CONFIRM operational requirements)
 
-No rate limiting is implemented yet on `POST /api/v1/gateway/token` or
-`POST /api/v1/gateway/ingest`. To design it from real requirements, please provide:
+A rate-limiting **mechanism** now exists for `POST /api/v1/gateway/token` and
+`POST /api/v1/gateway/ingest`, but it is **disabled by default and not enforcing**
+(`rate_limit_enabled = false`, `rate_limit_enforce = false`; shadow mode only - it never blocks
+and never returns 429). No limits are configured and **no numeric values are approved**. To set
+them from real requirements, please provide:
 1. Expected **token** request rate per gateway (and token lifetime/refresh behavior).
 2. Expected **ingest** request rate and message size per gateway (steady-state and peak).
 3. **Burst** limits and expected **retry/backoff** behavior on 429/503 (so retries interact
@@ -219,9 +273,15 @@ Please mark each item and return to the EMS backend team.
 | T3 — 3-year retention decision | | |
 | SoC — authoritative mappings | | |
 | Rate limiting — operational rates | | |
+| Transport/envelope & endpoint - the flat `EnvelopeIn` is posted to `POST /api/v1/gateway/ingest` (bearer token obtained from `POST /api/v1/gateway/token`), or is a separate `TransportBatch` contract required? | | |
+| Streams - which streams will the gateway send (including any currently deferred by the backend), and what handling is expected for unsupported streams? | | |
+| Payload-hash canonicalization - do gateway and backend agree on the exact canonical form (numeric representation, timestamp strings, quality casing)? | | |
+| Retry semantics - which HTTP statuses are final vs retryable, and the agreed retry/backoff and duplicate-acknowledgement behavior? | | |
+| T3 production retention - approved duration and deployed InfluxDB policy for the 12 T3 signals, and who verifies them? | | |
 
 **Responsible contact (gateway/EMS team):** ______________________
 **Confirmation date:** ______________________
 
-> Until B1 and B2 are confirmed, ingestion remains gated OFF. T3 signals remain fail-closed
-> until a retention policy is approved. SoC remains unresolved and will not be fabricated.
+> Until B1 and B2 are confirmed, ingestion remains gated OFF. T3 signals are ingested to the
+> configured `telemetry_3y` bucket, but their 3-year retention guarantee is proposed/unapproved
+> and the deployed InfluxDB policy is unverified. SoC remains unresolved and will not be fabricated.

@@ -13,6 +13,7 @@ from src.signals.types import QUALITY_SUFFIX, coerce, validate_quality
 from src.telemetry_errors import (
     InvalidTimestamp,
     RegistryConflict,
+    RetentionNotConfigured,
     SignalMismatch,
     UnknownRetentionClass,
     UnknownSignal,
@@ -36,19 +37,21 @@ def measurement_for(stream: str, substream: str) -> str:
 
 def bucket_for(retention_class: str, settings) -> str:
     """Code-level routing only (NOT the actual Influx retention policy, which must be
-    verified in InfluxDB). T1->raw, T2->long. Unknown classes fail closed.
+    verified in InfluxDB; see src/influx_provision.py). T1->raw, T2->long, T3->the
+    dedicated 3-year bucket. Unknown classes and a missing/blank T3 bucket fail closed.
 
-    INTERIM (decision 2026-10-26): no dedicated 3-year bucket is provisioned yet, so
-    T3_3Y is routed TEMPORARILY to the configured 1-year (long) bucket. This is NOT
-    three-year retention; data may be purged at the long bucket's retention window.
-    When a dedicated 3-year bucket/policy is provisioned, change this T3_3Y branch to
-    return that bucket. The registry keeps the T3_3Y classification unchanged."""
+    The T3 bucket's enforced retention (proposed 1095 d) is pending production
+    confirmation; it is verified against the configured seconds at provisioning time.
+    The registry keeps the T3_3Y classification unchanged."""
     if retention_class == "T1_RAW_90D":
         return settings.influx_bucket_raw
     if retention_class == "T2_1Y":
         return settings.influx_bucket_long
     if retention_class == "T3_3Y":
-        return settings.influx_bucket_long   # INTERIM 2026-10-26: see docstring; migrate later
+        bucket = getattr(settings, "influx_bucket_3y", "") or ""
+        if not str(bucket).strip():
+            raise RetentionNotConfigured("T3_3Y bucket not configured")
+        return bucket
     raise UnknownRetentionClass(f"Unknown retention class: {retention_class!r}")
 
 
@@ -221,7 +224,8 @@ class InfluxGateway:
         rebuilding. Destinations are restricted to THIS gateway's configured retention
         buckets; a tuple naming any other bucket is refused (never writes to an arbitrary
         non-configured bucket)."""
-        allowed = {self._settings.influx_bucket_raw, self._settings.influx_bucket_long}
+        allowed = {self._settings.influx_bucket_raw, self._settings.influx_bucket_long,
+                   self._settings.influx_bucket_3y}
         by_bucket: dict[str, list] = defaultdict(list)
         for bucket, pt in built:
             if bucket not in allowed:

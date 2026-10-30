@@ -6,19 +6,26 @@ from src.database import get_session
 from src.gateway import service
 from src.gateway.dependencies import get_current_gateway
 from src.gateway.schemas import GatewayIdentity, GatewayTokenRequest, GatewayTokenResponse
+from src.ratelimit import token_rate_limit
 
 router = APIRouter(prefix="/api/v1/gateway", tags=["gateway"])
 
 
 @router.post("/token", response_model=GatewayTokenResponse)
-async def gateway_token(body: GatewayTokenRequest, session: AsyncSession = Depends(get_session)):
+async def gateway_token(body: GatewayTokenRequest, session: AsyncSession = Depends(get_session),
+                        _rl=Depends(token_rate_limit)):
     gw = await service.get_gateway_by_client_id(session, body.client_id)
     # generic 401 for unknown client OR bad secret (do not reveal which)
     if gw is None or not verify_password(body.client_secret, gw.client_secret_hash):
         raise HTTPException(status.HTTP_401_UNAUTHORIZED, "Invalid credentials")
     if not gw.enabled:
         raise HTTPException(status.HTTP_403_FORBIDDEN, "Gateway disabled")
+    # Generate the token FIRST so a token-generation failure cannot persist a heartbeat.
     token = create_gateway_token(gw.id)
+    # interim liveness: record this SUCCESSFUL token issuance (not telemetry, not a
+    # live-connectivity guarantee). Commit the heartbeat in this request's own transaction.
+    await service.mark_gateway_seen(session, gw)
+    await session.commit()
     return GatewayTokenResponse(access_token=token, expires_in=GATEWAY_TOKEN_MINUTES * 60)
 
 

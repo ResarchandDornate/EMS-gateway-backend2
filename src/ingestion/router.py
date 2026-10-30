@@ -11,9 +11,16 @@ from src.ingestion.mapping import build_message_points
 from src.ingestion.providers import (get_influx_gateway, get_registry_index,
                                       require_ingest_enabled)
 from src.ingestion.schemas import EnvelopeIn, IngestAck
+from src.ingestion.s3_health import S3HealthEnvelopeIn
+from src.ingestion.health_service import StoreNotConfirmed, persist_health_message
+from src.ingestion.s4_alarms import S4AlarmEnvelopeIn
+from src.ingestion.alarm_service import persist_alarm_events
+from src.ingestion.s8_config_audit import S8ConfigAuditEnvelopeIn
+from src.ingestion.config_audit_service import persist_config_audit
+from src.ratelimit import ingest_rate_limit
 from src.ingestion.service import (IngestDecision, canonical_hash, claim_or_resolve,
                                    mark_stored, route_stream, verify_scope)
-from src.telemetry_errors import (InfluxTelemetryError, RetentionNotConfigured,
+from src.telemetry_errors import (InfluxTelemetryError, InvalidValue, RetentionNotConfigured,
                                    UnknownRetentionClass, UnresolvedMetadata)
 
 router = APIRouter(prefix="/api/v1/gateway", tags=["ingestion"])
@@ -22,6 +29,7 @@ router = APIRouter(prefix="/api/v1/gateway", tags=["ingestion"])
 @router.post("/ingest", response_model=IngestAck)
 async def ingest(
     request: Request,
+    _rl=Depends(ingest_rate_limit),          # rate limiter BEFORE gate + ledger claim (shadow by default)
     gw=Depends(require_ingest_enabled),          # auth (401/403) -> gate (503) -> here
     session: AsyncSession = Depends(get_session),
     index=Depends(get_registry_index),
@@ -33,30 +41,37 @@ async def ingest(
     and per-record timestamp semantics are NOT gateway-contract-confirmed; the
     default-disabled gate is the mitigation. Order is validate-before-claim.
     """
-    # ---- Phase A: body + envelope (no ledger, no write) ----
+    # ---- Phase A: body + stream routing (no ledger, no write) ----
     try:
         raw = await request.body()
         decoded = decode_body(raw, request.headers.get("content-encoding"))
     except BodyError as e:
         raise HTTPException(e.status_code, "request body rejected")
     try:
-        envelope = EnvelopeIn(**json.loads(decoded))
+        body = json.loads(decoded)
     except json.JSONDecodeError:
         raise HTTPException(status.HTTP_400_BAD_REQUEST, "malformed JSON body")
+
+    stream = body.get("stream") if isinstance(body, dict) else None
+    route = route_stream(stream if isinstance(stream, str) else "")
+    if route == "deferred":
+        raise HTTPException(status.HTTP_501_NOT_IMPLEMENTED, f"stream {stream} not supported yet")
+    if route == "structured":
+        return await _ingest_structured(body, session, gw)
+    if route != "ingest":
+        raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT, "unsupported stream")
+
+    # ---- numeric S1/S2 path (unchanged) ----
+    try:
+        envelope = EnvelopeIn(**body)
     except (ValidationError, TypeError, ValueError):
-        raise HTTPException(status.HTTP_422_UNPROCESSABLE_ENTITY, "invalid envelope")
+        raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT, "invalid envelope")
 
     # trusted DB-derived scope; client IDs are never trusted for authorization
     identity = await resolve_gateway_identity(session, gw)
     if not verify_scope(identity, gateway_id=envelope.gateway_id,
                         site_id=envelope.site_id, organization_id=envelope.organization_id):
         raise HTTPException(status.HTTP_403_FORBIDDEN, "envelope scope does not match gateway")
-
-    route = route_stream(envelope.stream)
-    if route == "deferred":
-        raise HTTPException(status.HTTP_501_NOT_IMPLEMENTED, f"stream {envelope.stream} not supported yet")
-    if route != "ingest":
-        raise HTTPException(status.HTTP_422_UNPROCESSABLE_ENTITY, "unsupported stream")
 
     # ---- Phase B: validate + build all points (no ledger, no write) ----
     try:
@@ -66,7 +81,7 @@ async def ingest(
     except UnresolvedMetadata:
         raise HTTPException(status.HTTP_500_INTERNAL_SERVER_ERROR, "registry metadata incomplete")
     except InfluxTelemetryError:
-        raise HTTPException(status.HTTP_422_UNPROCESSABLE_ENTITY, "invalid telemetry record")
+        raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT, "invalid telemetry record")
 
     payload_hash = canonical_hash(envelope.model_dump())
 
@@ -99,5 +114,48 @@ async def ingest(
         raise HTTPException(status.HTTP_503_SERVICE_UNAVAILABLE, "ingestion temporarily unavailable")
     if not stored:                                  # lease lost -> do NOT acknowledge stored
         raise HTTPException(status.HTTP_503_SERVICE_UNAVAILABLE, "store not confirmed; retry")
+    return IngestAck(status="stored", message_id=envelope.message_id,
+                     record_count=envelope.record_count)
+
+_STRUCTURED_HANDLERS = {
+    "S3": (S3HealthEnvelopeIn, persist_health_message),
+    "S4": (S4AlarmEnvelopeIn, persist_alarm_events),
+    "S8": (S8ConfigAuditEnvelopeIn, persist_config_audit),
+}
+
+
+async def _ingest_structured(body, session, gw) -> IngestAck:
+    """Structured-record ingest (S3 gateway_health, S4 alarms/events): validate -> scope ->
+    persist to PostgreSQL JSONB via the shared ledger. Mirrors the numeric path's auth/scope/
+    idempotency and HTTP error semantics. Malformed payloads fail before any ledger claim."""
+    stream = body.get("stream") if isinstance(body, dict) else None
+    envelope_cls, persist = _STRUCTURED_HANDLERS[stream]
+    try:
+        envelope = envelope_cls(**body)
+    except (ValidationError, TypeError, ValueError):
+        raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT, "invalid envelope")
+
+    # trusted DB-derived scope; client IDs are never trusted for authorization
+    identity = await resolve_gateway_identity(session, gw)
+    if not verify_scope(identity, gateway_id=envelope.gateway_id,
+                        site_id=envelope.site_id, organization_id=envelope.organization_id):
+        raise HTTPException(status.HTTP_403_FORBIDDEN, "envelope scope does not match gateway")
+
+    try:
+        decision = await persist(session, gw=gw, identity=identity, envelope=envelope)
+    except InvalidValue:
+        raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT, "invalid record")
+    except StoreNotConfirmed:
+        raise HTTPException(status.HTTP_503_SERVICE_UNAVAILABLE, "store not confirmed; retry")
+    except Exception:
+        raise HTTPException(status.HTTP_503_SERVICE_UNAVAILABLE, "ingestion temporarily unavailable")
+
+    if decision == IngestDecision.DUPLICATE_STORED:
+        return IngestAck(status="duplicate", message_id=envelope.message_id,
+                         record_count=envelope.record_count)
+    if decision == IngestDecision.HASH_MISMATCH:
+        raise HTTPException(status.HTTP_409_CONFLICT, "message_id reused with a different payload")
+    if decision == IngestDecision.IN_PROGRESS:
+        raise HTTPException(status.HTTP_409_CONFLICT, "message is already being processed")
     return IngestAck(status="stored", message_id=envelope.message_id,
                      record_count=envelope.record_count)

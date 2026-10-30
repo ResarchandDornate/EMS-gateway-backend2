@@ -171,3 +171,33 @@ async def test_gateway_registration_audited(client, session):
     )).scalars().all()
     assert len(rows) == 1
     assert rows[0].new_value["gateway_key"] == "GW-AUD"
+
+async def test_list_exposes_last_seen_at_null_then_populated(client, session):
+    c, _ = client
+    await seed_roles_permissions(session)
+    await session.commit()
+    sa = await make_super_admin(session, "9000000028")
+    data = await onboard(c, sa, "gw6", "9900000028", ["s1"])
+    site_id = data["sites"][0]["id"]
+
+    reg = await c.post(f"/api/v1/admin/sites/{site_id}/gateways",
+                       json={"gateway_key": "GW-LS"}, headers=auth_header(sa))
+    assert reg.status_code == 201
+    client_id = reg.json()["client_id"]
+    secret = reg.json()["client_secret"]
+
+    # before first token issuance -> field present and NULL (select the row by unique client_id)
+    rl = await c.get(f"/api/v1/admin/sites/{site_id}/gateways", headers=auth_header(sa))
+    assert rl.status_code == 200
+    row = next(r for r in rl.json() if r["client_id"] == client_id)
+    assert "last_seen_at" in row and row["last_seen_at"] is None
+
+    # successful token issuance records the heartbeat
+    rt = await c.post("/api/v1/gateway/token",
+                      json={"client_id": client_id, "client_secret": secret})
+    assert rt.status_code == 200
+
+    rl2 = await c.get(f"/api/v1/admin/sites/{site_id}/gateways", headers=auth_header(sa))
+    assert rl2.status_code == 200
+    row2 = next(r for r in rl2.json() if r["client_id"] == client_id)
+    assert row2["last_seen_at"] is not None

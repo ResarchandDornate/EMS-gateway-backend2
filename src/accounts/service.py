@@ -1,4 +1,5 @@
 from sqlalchemy import func, select
+from sqlalchemy.exc import IntegrityError
 import secrets
 
 from src.auth.security import hash_password
@@ -9,6 +10,42 @@ from src.rbac.models import RoleModel, UserRoleModel, UserSiteAccessModel
 from src.rbac.service import seed_org_permissions
 from src.tenancy.organizations.models import OrganizationModel
 from src.tenancy.sites.models import SiteModel
+
+
+class ConflictError(Exception):
+    """A duplicate-key conflict that must surface as HTTP 409."""
+    def __init__(self, detail: str):
+        self.detail = detail
+        super().__init__(detail)
+
+
+def _is_unique_violation(exc: IntegrityError) -> bool:
+    """True iff exc is a Postgres UNIQUE violation (SQLSTATE 23505). Uses only the
+    SQLSTATE the asyncpg adapter copies onto exc.orig (.sqlstate/.pgcode)."""
+    orig = getattr(exc, "orig", None)
+    code = getattr(orig, "sqlstate", None) or getattr(orig, "pgcode", None)
+    return code == "23505"
+
+
+def _unique_constraint_name(exc: IntegrityError) -> str | None:
+    """The exact violated UNIQUE constraint name (lowercased) for a 23505 error, or None.
+
+    The SQLAlchemy asyncpg dialect raises its wrapper with `raise translated_error from
+    error`, so the ORIGINAL asyncpg error - which carries `.constraint_name` - is
+    reachable through the cause/context chain. Returns None if it is not a unique
+    violation OR the name cannot be recovered; callers then degrade safely (generic 409
+    or re-raise), never guessing which key collided."""
+    if not _is_unique_violation(exc):
+        return None
+    orig = getattr(exc, "orig", None)
+    for obj in (orig,
+                getattr(orig, "__cause__", None),
+                getattr(orig, "__context__", None),
+                getattr(exc, "__cause__", None)):
+        name = getattr(obj, "constraint_name", None)
+        if name:
+            return name.lower()
+    return None
 
 
 async def get_role(session, name):
@@ -29,51 +66,67 @@ async def phone_exists(session, phone):
 
 
 async def create_client(session, actor_id, data):
-    # 1. organization
-    org = OrganizationModel(org_key=data.org_key, name=data.name)
-    session.add(org)
-    await session.flush()
+    try:
+        # 1. organization
+        org = OrganizationModel(org_key=data.org_key, name=data.name)
+        session.add(org)
+        await session.flush()
 
-    # 2. give the org its permission rows at safe defaults
-    await seed_org_permissions(session, org.id)
+        # 2. give the org its permission rows at safe defaults
+        await seed_org_permissions(session, org.id)
 
-    # 3. org admin user (phone login, no password)
-    admin = UserModel(
-        phone=data.admin_phone,
-        email=data.admin_email,
-        organization_id=org.id,
-    )
-    session.add(admin)
-    await session.flush()
+        # 3. org admin user (phone login, no password)
+        admin = UserModel(
+            phone=data.admin_phone,
+            email=data.admin_email,
+            organization_id=org.id,
+        )
+        session.add(admin)
+        await session.flush()
 
-    # 4. assign org_admin role
-    role = await get_role(session, "org_admin")
-    session.add(UserRoleModel(user_id=admin.id, role_id=role.id))
+        # 4. assign org_admin role
+        role = await get_role(session, "org_admin")
+        session.add(UserRoleModel(user_id=admin.id, role_id=role.id))
 
-    # 5. sites for this org
-    sites = []
-    for s in data.sites:
-        site = SiteModel(organization_id=org.id, site_key=s.site_key, name=s.name)
-        session.add(site)
-        sites.append(site)
-    await session.flush()
+        # 5. sites for this org (keys normalized by the schema; intra-request dups are
+        #    rejected in the router before this runs)
+        sites = []
+        for s in data.sites:
+            site = SiteModel(organization_id=org.id, site_key=s.site_key, name=s.name)
+            session.add(site)
+            sites.append(site)
+        await session.flush()
 
-    # 6. audit
-    session.add(AdminAuditModel(
-        actor_user_id=actor_id,
-        action="client_onboarded",
-        target_type="organization",
-        target_id=org.id,
-        new_value={
-            "org_key": org.org_key,
-            "name": org.name,
-            "admin_phone": admin.phone,
-            "sites": [s.site_key for s in sites],
-        },
-    ))
+        # 6. audit
+        session.add(AdminAuditModel(
+            actor_user_id=actor_id,
+            action="client_onboarded",
+            target_type="organization",
+            target_id=org.id,
+            new_value={
+                "org_key": org.org_key,
+                "name": org.name,
+                "admin_phone": admin.phone,
+                "sites": [s.site_key for s in sites],
+            },
+        ))
 
-    await session.commit()
-    return org, admin, sites
+        await session.commit()
+        return org, admin, sites
+    except IntegrityError as e:
+        await session.rollback()                     # clean the session BEFORE reuse/return
+        if _is_unique_violation(e):
+            name = _unique_constraint_name(e) or ""
+            if "org_key" in name:
+                raise ConflictError("Organization key already exists")
+            if "site_key" in name:
+                raise ConflictError("Site key already exists in this organization")
+            if "phone" in name:
+                raise ConflictError("Phone number already registered")
+            if "email" in name:
+                raise ConflictError("Email already registered")
+            raise ConflictError("Duplicate key conflict")   # unique but unnamed -> safe generic 409
+        raise                                                # not a unique violation -> surface
 
 
 async def list_clients(session):
@@ -159,31 +212,40 @@ async def create_operator(session, org_admin, data):
     if data.phone and await phone_exists(session, data.phone):
         return None, "phone"
 
-    operator = UserModel(
-        phone=data.phone,
-        email=data.email,
-        organization_id=org_id,
-        is_active=True,
-    )
-    session.add(operator)
-    await session.flush()
+    try:
+        operator = UserModel(
+            phone=data.phone,
+            email=data.email,
+            organization_id=org_id,
+            is_active=True,
+        )
+        session.add(operator)
+        await session.flush()
 
-    role = await get_role(session, "site_operator")
-    session.add(UserRoleModel(user_id=operator.id, role_id=role.id))
+        role = await get_role(session, "site_operator")
+        session.add(UserRoleModel(user_id=operator.id, role_id=role.id))
 
-    for site_id in data.site_ids:
-        session.add(UserSiteAccessModel(user_id=operator.id, site_id=site_id))
+        for site_id in data.site_ids:
+            session.add(UserSiteAccessModel(user_id=operator.id, site_id=site_id))
 
-    session.add(AdminAuditModel(
-        actor_user_id=org_admin.id,
-        action="operator_created",
-        target_type="user",
-        target_id=operator.id,
-        new_value={"phone": data.phone, "sites": [str(s) for s in data.site_ids]},
-    ))
+        session.add(AdminAuditModel(
+            actor_user_id=org_admin.id,
+            action="operator_created",
+            target_type="user",
+            target_id=operator.id,
+            new_value={"phone": data.phone, "sites": [str(s) for s in data.site_ids]},
+        ))
 
-    await session.commit()
-    return operator, None
+        await session.commit()
+        return operator, None
+    except IntegrityError as e:
+        await session.rollback()
+        name = _unique_constraint_name(e) or ""
+        if "email" in name:                              # exact: never mislabels email as phone
+            return None, "email"
+        if "phone" in name:
+            return None, "phone"
+        raise                                            # unnamed / unrelated -> surface
 
 
 async def deactivate_operator(session, org_admin, operator_id):
@@ -233,34 +295,41 @@ async def register_gateway(session, actor, site, data):
     if await gateway_key_exists(session, data.gateway_key):
         return None, None, "duplicate"
 
-    client_id = await _unique_client_id(session)
+    client_id = await _unique_client_id(session)         # UNCHANGED: server-generated
     client_secret = secrets.token_urlsafe(32)
 
-    gateway = GatewayModel(
-        site_id=site.id,
-        gateway_key=data.gateway_key,
-        client_id=client_id,
-        client_secret_hash=hash_password(client_secret),
-        software_version=data.software_version,
-        enabled=True,
-    )
-    session.add(gateway)
-    await session.flush()
+    try:
+        gateway = GatewayModel(
+            site_id=site.id,
+            gateway_key=data.gateway_key,
+            client_id=client_id,
+            client_secret_hash=hash_password(client_secret),
+            software_version=data.software_version,
+            enabled=True,
+        )
+        session.add(gateway)
+        await session.flush()
 
-    session.add(AdminAuditModel(
-        actor_user_id=actor.id,
-        action="gateway_registered",
-        target_type="gateway",
-        target_id=gateway.id,
-        new_value={
-            "gateway_key": gateway.gateway_key,
-            "site_id": str(site.id),
-            "client_id": client_id,
-        },
-    ))
+        session.add(AdminAuditModel(
+            actor_user_id=actor.id,
+            action="gateway_registered",
+            target_type="gateway",
+            target_id=gateway.id,
+            new_value={
+                "gateway_key": gateway.gateway_key,
+                "site_id": str(site.id),
+                "client_id": client_id,
+            },
+        ))
 
-    await session.commit()
-    return gateway, client_secret, None
+        await session.commit()
+        return gateway, client_secret, None
+    except IntegrityError as e:
+        await session.rollback()
+        name = _unique_constraint_name(e) or ""
+        if "gateway_key" in name:                        # ONLY the expected key -> duplicate
+            return None, None, "duplicate"
+        raise                                            # client_id collision / unnamed / other -> surface
 
 
 async def list_gateways(session, site_id):

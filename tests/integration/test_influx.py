@@ -39,9 +39,8 @@ def test_bucket_t1_t2():
     assert bucket_for("T1_RAW_90D", _SETTINGS) == _SETTINGS.influx_bucket_raw
     assert bucket_for("T2_1Y", _SETTINGS) == _SETTINGS.influx_bucket_long
 
-def test_bucket_t3_interim_routes_to_long():
-    # INTERIM 2026-10-26: T3_3Y temporarily routes to the configured long (1-year) bucket.
-    assert bucket_for("T3_3Y", _SETTINGS) == _SETTINGS.influx_bucket_long
+def test_bucket_t3_routes_to_3y():
+    assert bucket_for("T3_3Y", _SETTINGS) == _SETTINGS.influx_bucket_3y
 
 def test_bucket_unknown_rejected():
     with pytest.raises(UnknownRetentionClass): bucket_for("T9_X", _SETTINGS)
@@ -51,6 +50,21 @@ def test_field_types_supported():
 
 def test_field_type_unsupported():
     with pytest.raises(UnsupportedDataType): field_type("STRING")
+
+def test_field_type_rejects_nonnumeric_data_type_strings():
+    # "system_alarm" / "system_data" are registry *category* labels, NOT data_types. The signals in
+    # those categories carry numeric data_types (U16 / FLOAT32) and ingest as numeric points today;
+    # load_registry_index does not even carry `category` into the write path. This test only pins that
+    # field_type/coerce reject a *data_type* string that is not a known numeric type -- it does NOT
+    # imply those category signals are unsupported.
+    for not_a_data_type in ("system_alarm", "system_data"):
+        with pytest.raises(UnsupportedDataType):
+            field_type(not_a_data_type)
+        with pytest.raises(UnsupportedDataType):
+            coerce(not_a_data_type, 1)
+    # the numeric data_types those categories actually use ARE accepted:
+    assert field_type("U16") == "int"
+    assert field_type("FLOAT32") == "float"
 
 def test_u16_bounds():
     assert coerce("U16", 0) == 0 and coerce("U16", 65535) == 65535
@@ -118,11 +132,10 @@ def test_asset_type_required_from_registry():
         build_point(_IDX_NO_ASSET, _pt("s", "a", "src", "sig_no_asset", 1, ts,
                                        meas="s2_x", substream="x"), _SETTINGS)
 
-def test_retention_t3_interim_builds_to_long():
-    # INTERIM 2026-10-26: T3 builds a point routed to the long (1-year) bucket, not rejected.
+def test_retention_t3_builds_to_3y():
     ts = datetime.now(timezone.utc)
     bucket, _built = build_point(_IDX, _pt("s", "r1", "src", "rack_energy", 10.0, ts), _SETTINGS)
-    assert bucket == _SETTINGS.influx_bucket_long
+    assert bucket == _SETTINGS.influx_bucket_3y
 
 def test_registry_type_enforced():
     ts = datetime.now(timezone.utc)
@@ -290,3 +303,46 @@ async def test_batch_all_or_nothing(influx_test):
         assert res == []     # nothing written because build happens before any I/O
     finally:
         await _cleanup(gw, bucket, site, now, now)
+
+
+def test_bucket_t3_blank_config_fails_closed():
+    import types as _t
+    from src.telemetry_errors import RetentionNotConfigured
+    blank = _t.SimpleNamespace(influx_bucket_raw="r", influx_bucket_long="l", influx_bucket_3y="   ")
+    with pytest.raises(RetentionNotConfigured):
+        bucket_for("T3_3Y", blank)
+    missing = _t.SimpleNamespace(influx_bucket_raw="r", influx_bucket_long="l")  # attr absent
+    with pytest.raises(RetentionNotConfigured):
+        bucket_for("T3_3Y", missing)
+
+
+def test_bucket_t1_t2_preserved_with_3y():
+    import types as _t
+    s = _t.SimpleNamespace(influx_bucket_raw="raw_b", influx_bucket_long="long_b",
+                           influx_bucket_3y="three_b")
+    assert bucket_for("T1_RAW_90D", s) == "raw_b"
+    assert bucket_for("T2_1Y", s) == "long_b"
+
+
+async def test_writer_accepts_3y_bucket(monkeypatch):
+    # The writer's allowed-bucket guard admits the 3-year bucket (reject path is covered in
+    # test_ingest_endpoint). _client is stubbed so no real I/O occurs.
+    import types as _t, contextlib as _c
+    from influxdb_client import Point
+    s = _t.SimpleNamespace(influx_url="http://x", influx_token="t", influx_org="o",
+                           influx_bucket_raw="raw_b", influx_bucket_long="long_b",
+                           influx_bucket_3y="three_b", influx_bucket_test="test_b")
+    gw = InfluxGateway(settings=s)
+    seen = {}
+    class _W:
+        async def write(self, bucket=None, record=None):
+            seen[bucket] = record
+    class _C:
+        def write_api(self):
+            return _W()
+    @_c.asynccontextmanager
+    async def _fake():
+        yield _C()
+    monkeypatch.setattr(gw, "_client", _fake)
+    await gw.write_built([("three_b", Point("m"))])
+    assert "three_b" in seen

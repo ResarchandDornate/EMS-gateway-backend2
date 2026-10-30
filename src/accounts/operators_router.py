@@ -30,6 +30,8 @@ async def create_operator(
         raise HTTPException(status_code=400, detail="One or more sites do not belong to your organization")
     if error == "phone":
         raise HTTPException(status_code=409, detail="Phone number already registered")
+    if error == "email":
+        raise HTTPException(status_code=409, detail="Email already registered")
 
     site_ids = await service.operator_site_ids(session, operator.id)
     return OperatorDetail(
