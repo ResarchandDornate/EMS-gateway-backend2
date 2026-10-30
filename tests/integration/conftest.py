@@ -22,6 +22,7 @@ from src.ingestion import solis_models as _ings  # noqa: F401
 from src.ingestion import edge_ai_models as _inge  # noqa: F401
 from src.ingestion import config_audit_models as _ingca  # noqa: F401
 from src.ingestion import command_result_models as _ingcr  # noqa: F401
+from src.ingestion import fast_bess_models as _ingfb  # noqa: F401
 from src.auth.otp_provider import MockOtpProvider, get_otp_provider
 from src.database import get_session
 from src.main import app
