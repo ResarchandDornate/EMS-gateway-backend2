@@ -55,6 +55,26 @@ services:
       timeout: 3s
       retries: 20
 
+  api:
+    build: .
+    env_file: .env
+    environment:
+      # container-network hosts override the localhost ones in .env
+      DATABASE_URL: postgresql+asyncpg://ems:ems_dev_password@postgres:5432/ems
+      INFLUX_URL: http://influxdb:8086
+      REDIS_URL: redis://redis:6379/0
+    ports: ["8040:8000"]
+    depends_on:
+      postgres: { condition: service_healthy }
+      redis: { condition: service_healthy }
+      influxdb: { condition: service_healthy }
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/health')"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+
 volumes:
   pgdata:
   influxdata:
