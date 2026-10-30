@@ -16,6 +16,8 @@ from src.ingestion.providers import (get_influx_gateway, get_registry_index,
 from src.ingestion.schemas import EnvelopeIn, IngestAck
 from src.ingestion.s1_fast_bess import S1FastBessEnvelopeIn
 from src.ingestion.fast_bess_service import persist_fast_bess_message
+from src.ingestion.generic_stream import GenericStreamEnvelopeIn
+from src.ingestion.stream_service import persist_stream_message
 from src.ingestion.s3_health import S3HealthEnvelopeIn
 from src.ingestion.health_service import StoreNotConfirmed, persist_health_message
 from src.ingestion.s4_alarms import S4AlarmEnvelopeIn
@@ -188,7 +190,9 @@ async def _ingest_batch(body, session, gw) -> JSONResponse:
             continue
 
         try:
-            envelope = S1FastBessEnvelopeIn(**canonical)
+            code = canonical.get("stream")
+            envelope_cls = S1FastBessEnvelopeIn if code == "S1" else GenericStreamEnvelopeIn
+            envelope = envelope_cls(**canonical)
         except (ValidationError, TypeError, ValueError) as e:
             _reject(canonical.get("message_id"), "invalid_payload",
                     _format_validation_error(e), retryable=True)
@@ -203,7 +207,8 @@ async def _ingest_batch(body, session, gw) -> JSONResponse:
             continue
 
         try:
-            decision = await persist_fast_bess_message(
+            persist = persist_fast_bess_message if code == "S1" else persist_stream_message
+            decision = await persist(
                 session, gw=gw, identity=identity, envelope=envelope)
         except InvalidValue as e:
             _reject(str(envelope.message_id), "invalid_payload", str(e), retryable=True)

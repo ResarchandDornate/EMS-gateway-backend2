@@ -5,12 +5,13 @@ The legacy gateway uploader posts a TransportBatch wrapper:
     {"request_id": "...", "gateway_id": "...", "sent_at_utc": "...",
      "messages": [ {per-message envelope with a LEGACY stream name}, ... ]}
 
-This module translates each message into a canonical envelope WITHOUT weakening the
-single-message endpoint. Only `fast_bess_telemetry` is accepted; it maps to S1/bess_fast
-and is stored VERBATIM as structured JSONB (the real S1 record is mixed-type nested
-objects, not numeric). Records are passed through unchanged - no explode, no per-signal
-coercion, no registry lookup at ingest. S2 and every other stream are intentionally not
-accepted yet; the caller surfaces them as retryable rejects so the gateway keeps them.
+Each message is translated into a canonical envelope and stored VERBATIM as structured
+JSONB (no explode, no per-signal coercion, no registry lookup) - S1 fast_bess in its own
+table, S2..S10 in the generic stream store. The single-message endpoint is untouched.
+
+Legacy stream name -> canonical code + substream (Kalpa Central Sync Master Contract v1.1
+STREAM INDEX). S2 carries its substream per message. D1 (downlink) is out of scope and
+S2's combiner_box_meter substream is excluded by contract decision.
 
 Identity (gateway_id / site_id / organization_id) is stamped by the caller from the
 authenticated gateway's DB-resolved identity; the legacy strings in the batch are never
@@ -18,10 +19,23 @@ trusted for authorization. message_id, sequence, created_at_utc and every record
 are preserved exactly.
 """
 
-# Legacy stream name -> (canonical stream code, substream). S1 ONLY.
+# Legacy stream name -> (canonical stream code, fixed substream | None).
+# None substream means "take substream from the message" (S2 general_asset_telemetry).
 LEGACY_STREAM_MAP = {
     "fast_bess_telemetry": ("S1", "bess_fast"),
+    "general_asset_telemetry": ("S2", None),
+    "gateway_health": ("S3", "gateway"),
+    "alarms_events": ("S4", "events"),
+    "soc_controller": ("S5", "controller"),
+    "solis": ("S6", "solis"),
+    "edge_ai": ("S7", "per_bess"),
+    "configuration_audit": ("S8", "gateway"),
+    "command_results": ("S9", "commands"),
+    "battery_charge_discharge_control": ("S10", "pair_controller"),
 }
+
+# S2 substreams intentionally NOT ingested (contract decision).
+EXCLUDED_SUBSTREAMS = frozenset({"combiner_box_meter"})
 
 # Upper bound on messages per batch (body size is already capped in body.decode_body).
 MAX_BATCH_MESSAGES = 10_000
@@ -55,10 +69,9 @@ def is_batch_body(body) -> bool:
 
 
 def adapt_batch_message(msg, identity: dict) -> dict:
-    """Translate one legacy batch message into a canonical S1 structured envelope dict
-    (records preserved verbatim). Raises BatchMessageError (with a per-message error_code
-    + diagnostic) if the message is for an unsupported stream or is missing required
-    fields."""
+    """Translate one legacy batch message into a canonical envelope dict (records verbatim).
+    Raises BatchMessageError (with a per-message error_code + diagnostic) for unsupported
+    streams, excluded substreams, or missing required fields."""
     if not isinstance(msg, dict):
         raise BatchMessageError(422, "batch message is not a JSON object")
 
@@ -67,11 +80,21 @@ def adapt_batch_message(msg, identity: dict) -> dict:
     if not isinstance(raw_stream, str) or raw_stream not in LEGACY_STREAM_MAP:
         raise BatchMessageError(
             422,
-            f"stream {raw_stream!r} is not supported yet; only {sorted(LEGACY_STREAM_MAP)} "
-            f"(-> S1/bess_fast) is accepted.",
+            f"stream {raw_stream!r} is not supported yet; supported: {sorted(LEGACY_STREAM_MAP)}.",
             error_code="stream_not_yet_supported", message_id=mid,
         )
-    code, substream = LEGACY_STREAM_MAP[raw_stream]
+    code, fixed_sub = LEGACY_STREAM_MAP[raw_stream]
+
+    if fixed_sub is not None:
+        substream = fixed_sub
+    else:
+        substream = msg.get("substream")                      # S2: per-message substream
+        if not isinstance(substream, str) or not substream:
+            raise BatchMessageError(422, "batch message missing 'substream'", message_id=mid)
+    if substream in EXCLUDED_SUBSTREAMS:
+        raise BatchMessageError(
+            422, f"substream {substream!r} is excluded from ingestion",
+            error_code="substream_excluded", message_id=mid)
 
     records = msg.get("records")
     if not isinstance(records, list):

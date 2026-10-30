@@ -22,6 +22,7 @@ from src.config import get_settings
 from src.influx import RegistryIndex
 from src.ingestion.models import IngestMessageModel
 from src.ingestion.fast_bess_models import FastBessRecordModel
+from src.ingestion.stream_models import StreamRecordModel
 from src.ingestion.providers import (get_influx_gateway, get_registry_index,
                                       reset_registry_cache)
 from src.tenancy.gateways.models import GatewayModel
@@ -184,7 +185,7 @@ async def test_unsupported_stream_retryable_reject(client, session, enabled):
     c, _ = client
     org, site, gw = await _mk(session)
     r = await c.post(URL, json=_batch([_legacy_msg([{"x": 1}], message_id=uuid.uuid4(),
-                                                   stream="general_asset_telemetry")]),
+                                                   stream="totally_unknown_stream")]),
                      headers=_auth(gw))
     assert r.status_code == 200, r.text
     body = r.json()
@@ -213,7 +214,7 @@ async def test_mixed_batch_good_and_unsupported(client, session, enabled):
     good = uuid.uuid4()
     batch = _batch([
         _legacy_msg([_nested_rec()], message_id=good, sequence=1),
-        _legacy_msg([{"x": 1}], message_id=uuid.uuid4(), sequence=2, stream="general_asset_telemetry"),
+        _legacy_msg([{"x": 1}], message_id=uuid.uuid4(), sequence=2, stream="totally_unknown_stream"),
     ])
     r = await c.post(URL, json=batch, headers=_auth(gw))
     assert r.status_code == 200, r.text
@@ -254,3 +255,106 @@ async def test_body_without_stream_or_messages_422(client, session, enabled):
     r = await c.post(URL, json={"foo": "bar"}, headers=_auth(gw))
     assert r.status_code == 422
     assert await _ledger_count(session) == 0
+
+# ================= S2..S10 generic verbatim store =================
+
+def _gen_msg(stream, substream, records, *, message_id=None, sequence=0):
+    return {"schema_version": "1.0", "message_id": str(message_id or uuid.uuid4()),
+            "gateway_id": "kalpa-ems-gateway-001", "site_id": "kalpa",
+            "stream": stream, "substream": substream, "sequence": sequence,
+            "created_at_utc": TS, "record_count": len(records), "priority": "P1",
+            "records": records}
+
+
+async def _sr_rows(session):
+    return (await session.execute(select(StreamRecordModel))).scalars().all()
+
+
+async def test_s2_bms_extended_stored_verbatim(client, session, enabled):
+    c, _ = client
+    org, site, gw = await _mk(session)
+    mid = uuid.uuid4()
+    rec = {"record_type": "general_asset_signal", "source_id": "lineage_source",
+           "runtime_asset_id": "rack_1", "point_id": "rack.rack_data.rack_operating_state",
+           "signal": "rack_operating_state", "value": 2, "unit": None, "quality": "good",
+           "source_updated_utc": TS_Z}
+    r = await c.post(URL, json=_batch([_gen_msg("general_asset_telemetry", "bms_extended",
+                                                [rec], message_id=mid)]), headers=_auth(gw))
+    assert r.status_code == 200, r.text
+    assert r.json()["accepted"] == [{"message_id": str(mid), "status": "accepted"}]
+    rows = await _sr_rows(session)
+    assert len(rows) == 1
+    row = rows[0]
+    assert row.gateway_id == gw.id and row.stream == "S2" and row.substream == "bms_extended"
+    assert row.source_id == "lineage_source"
+    assert row.payload["signal"] == "rack_operating_state" and row.payload["value"] == 2
+    assert len(await _fb_rows(session)) == 0          # S1 table untouched
+
+
+async def test_s10_control_stored(client, session, enabled):
+    c, _ = client
+    org, site, gw = await _mk(session)
+    rec = {"source_id": "ctrl", "pair_id": "pair_1", "command": "idle", "timestamp_utc": TS_Z}
+    r = await c.post(URL, json=_batch([_gen_msg("battery_charge_discharge_control",
+                                                "pair_controller", [rec], message_id=uuid.uuid4())]),
+                     headers=_auth(gw))
+    assert r.status_code == 200, r.text
+    assert r.json()["accepted"][0]["status"] == "accepted"
+    rows = await _sr_rows(session)
+    assert len(rows) == 1 and rows[0].stream == "S10"
+
+
+async def test_s3_health_stored_verbatim(client, session, enabled):
+    c, _ = client
+    org, site, gw = await _mk(session)
+    rec = {"status": "ok", "timestamp_utc": TS_Z, "gateway_mode": "normal",
+           "storage": {"can_write": True}, "sources": [{"id": "s1", "online": True}]}
+    r = await c.post(URL, json=_batch([_gen_msg("gateway_health", "gateway", [rec],
+                                                message_id=uuid.uuid4())]), headers=_auth(gw))
+    assert r.status_code == 200, r.text
+    assert r.json()["accepted"][0]["status"] == "accepted"
+    rows = await _sr_rows(session)
+    assert len(rows) == 1 and rows[0].stream == "S3"
+    assert rows[0].payload["storage"]["can_write"] is True
+    assert rows[0].payload["sources"] == [{"id": "s1", "online": True}]
+
+
+async def test_combiner_box_meter_excluded(client, session, enabled):
+    c, _ = client
+    org, site, gw = await _mk(session)
+    r = await c.post(URL, json=_batch([_gen_msg("general_asset_telemetry", "combiner_box_meter",
+                                                [{"x": 1}], message_id=uuid.uuid4())]),
+                     headers=_auth(gw))
+    assert r.status_code == 200, r.text
+    assert r.json()["accepted"] == []
+    rej = r.json()["rejected"][0]
+    assert rej["error_code"] == "substream_excluded" and rej["retryable"] is True
+    assert len(await _sr_rows(session)) == 0
+
+
+async def test_s2_missing_substream_rejected(client, session, enabled):
+    c, _ = client
+    org, site, gw = await _mk(session)
+    bad = {"schema_version": "1.0", "message_id": str(uuid.uuid4()), "gateway_id": "k",
+           "site_id": "k", "stream": "general_asset_telemetry", "sequence": 1,
+           "created_at_utc": TS, "records": [{"x": 1}]}
+    r = await c.post(URL, json=_batch([bad]), headers=_auth(gw))
+    assert r.status_code == 200, r.text
+    assert r.json()["accepted"] == [] and r.json()["rejected"][0]["retryable"] is True
+    assert len(await _sr_rows(session)) == 0
+
+
+async def test_mixed_streams_s1_s2_s10(client, session, enabled):
+    c, _ = client
+    org, site, gw = await _mk(session)
+    s1 = _legacy_msg([_nested_rec()], message_id=uuid.uuid4())
+    s2 = _gen_msg("general_asset_telemetry", "pcs_extended",
+                  [{"source_id": "x", "signal": "soc", "value": 55}], message_id=uuid.uuid4())
+    s10 = _gen_msg("battery_charge_discharge_control", "pair_controller",
+                   [{"source_id": "c", "timestamp_utc": TS_Z}], message_id=uuid.uuid4())
+    r = await c.post(URL, json=_batch([s1, s2, s10]), headers=_auth(gw))
+    assert r.status_code == 200, r.text
+    assert len(r.json()["accepted"]) == 3 and r.json()["rejected"] == []
+    assert len(await _fb_rows(session)) == 1                       # S1
+    srs = await _sr_rows(session)
+    assert {x.stream for x in srs} == {"S2", "S10"}
