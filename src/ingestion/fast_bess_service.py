@@ -1,10 +1,10 @@
-"""S1 fast_bess_telemetry persistence (structured JSONB path).
+"""S1 fast_bess_telemetry persistence (PostgreSQL structured JSONB path).
 
-Reuses the ingest_messages ledger for idempotency/leasing exactly like S3 health:
-claim_or_resolve -> upsert JSONB -> mark_stored (lease-owned CAS). Records are stored
-VERBATIM (nested objects, booleans, strings, nulls, arrays preserved). A retried message
+S1 is mixed-type structured (nested per-signal objects with bool/str/null/list) and is
+stored verbatim in PostgreSQL - it is NOT written to InfluxDB. Reuses the ingest_messages
+ledger (claim_or_resolve -> upsert -> mark_stored) exactly like S3. A retried message
 overwrites in place on (gateway_id, message_id, record_index). Record timestamps are
-resolved BEFORE the ledger claim so a bad record never leaves a stuck 'pending' row.
+resolved before the ledger claim so a bad record never leaves a stuck 'pending' row.
 """
 import uuid
 
@@ -28,16 +28,14 @@ def _str_or_none(v):
 
 
 def _build_rows(gw_id, identity: dict, envelope: S1FastBessEnvelopeIn) -> list[dict]:
-    """Pure: resolve a recorded_at per record and build verbatim JSONB rows.
-    Raises InvalidValue (-> rejected) before any ledger write."""
     rows = []
     for i, rec in enumerate(envelope.records):
         if not isinstance(rec, dict):
             raise InvalidValue(f"record[{i}] is not a JSON object")
         ts = rec.get("timestamp_utc")
         if not (isinstance(ts, str) and ts):
-            ts = envelope.created_at_utc                   # fallback: envelope time
-        recorded_at = parse_record_timestamp(ts)           # InvalidValue if unparseable
+            ts = envelope.created_at_utc
+        recorded_at = parse_record_timestamp(ts)
         rows.append(dict(
             id=uuid.uuid4(),
             gateway_id=gw_id,
@@ -49,7 +47,7 @@ def _build_rows(gw_id, identity: dict, envelope: S1FastBessEnvelopeIn) -> list[d
             source_id=_str_or_none(rec.get("source_id")),
             bess_id=_str_or_none(rec.get("bess_id")),
             recorded_at=recorded_at,
-            payload=rec,                                   # verbatim
+            payload=rec,
         ))
     return rows
 
@@ -76,11 +74,7 @@ async def _upsert_rows(session, rows: list[dict]) -> None:
 
 async def persist_fast_bess_message(session, *, gw, identity: dict,
                                     envelope: S1FastBessEnvelopeIn) -> IngestDecision:
-    """Full S1 ingest decision+persist. Order: validate -> hash -> claim -> write(JSONB)
-    -> mark_stored. Returns a RESOLVED decision (duplicate/hash-mismatch/in-progress)
-    without writing; otherwise writes and returns CLAIMED/RECLAIMED. Raises
-    StoreNotConfirmed if the lease was lost mid-write (retryable)."""
-    rows = _build_rows(gw.id, identity, envelope)                      # validate-before-claim
+    rows = _build_rows(gw.id, identity, envelope)
     payload_hash = canonical_hash(envelope.model_dump(mode="json"))
 
     decision, token = await claim_or_resolve(

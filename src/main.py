@@ -2,6 +2,7 @@ import asyncio
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from redis.asyncio import Redis
 from sqlalchemy import text
@@ -13,7 +14,9 @@ from src.accounts.operators_router import router as operators_router
 from src.gateway.router import router as gateway_router
 from src.ingestion.router import router as ingest_router
 from src.telemetry.router import router as telemetry_router
-from src.config import get_settings
+from src.fast_bess.router import router as fast_bess_router
+from src.structured_reads.router import router as structured_reads_router
+from src.config import get_settings, resolve_cors_origins
 from src.database import engine
 from src.influx import InfluxGateway
 from src.logging import configure_logging
@@ -33,6 +36,27 @@ async def _lifespan(app: FastAPI):
         yield
     finally:
         await shutdown_rate_limiter(app)
+
+
+CORS_METHODS = ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS']
+CORS_HEADERS = ['Authorization', 'Content-Type']
+
+
+def add_cors(app: FastAPI, settings) -> FastAPI:
+    # Mount CORS from configured origins; no-op when none set (prod stays locked down
+    # until origins are configured). Bearer auth is header-based, so credentials default off.
+    origins = resolve_cors_origins(settings)
+    if origins:
+        app.add_middleware(
+            CORSMiddleware,
+            allow_origins=origins,
+            allow_credentials=settings.cors_allow_credentials,
+            allow_methods=CORS_METHODS,
+            allow_headers=CORS_HEADERS,
+            expose_headers=['X-Request-ID'],
+            max_age=600,
+        )
+    return app
 
 
 def create_app() -> FastAPI:
@@ -83,6 +107,9 @@ def create_app() -> FastAPI:
     app.include_router(gateway_router)   # mounts /api/v1/gateway/*
     app.include_router(ingest_router)    # mounts /api/v1/gateway/ingest (503 until 9b-ii)
     app.include_router(telemetry_router) # mounts /api/v1/telemetry/* (read-only; ungated)
+    app.include_router(fast_bess_router) # mounts /api/v1/bess/fast/* (S1 reads; PostgreSQL)
+    app.include_router(structured_reads_router) # S3-S9 reads (health/alarms/controller/solis/edge-ai/config-audit/commands)
+    add_cors(app, get_settings())
     return app
 
 

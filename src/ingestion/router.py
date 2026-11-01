@@ -17,13 +17,22 @@ from src.ingestion.schemas import EnvelopeIn, IngestAck
 from src.ingestion.s1_fast_bess import S1FastBessEnvelopeIn
 from src.ingestion.fast_bess_service import persist_fast_bess_message
 from src.ingestion.generic_stream import GenericStreamEnvelopeIn
-from src.ingestion.stream_service import persist_stream_message
+from src.ingestion.stream_service import persist_stream_message, persist_influx_only
+from src.ingestion.influx_projection import build_influx_points
 from src.ingestion.s3_health import S3HealthEnvelopeIn
 from src.ingestion.health_service import StoreNotConfirmed, persist_health_message
 from src.ingestion.s4_alarms import S4AlarmEnvelopeIn
 from src.ingestion.alarm_service import persist_alarm_events
 from src.ingestion.s8_config_audit import S8ConfigAuditEnvelopeIn
 from src.ingestion.config_audit_service import persist_config_audit
+from src.ingestion.s5_controller import S5ControllerEnvelopeIn
+from src.ingestion.controller_service import persist_controller_state
+from src.ingestion.s6_solis import S6SolisEnvelopeIn
+from src.ingestion.solis_service import persist_solis_telemetry
+from src.ingestion.s7_edge_ai import S7EdgeAiEnvelopeIn
+from src.ingestion.edge_ai_service import persist_edge_ai_inference
+from src.ingestion.s9_command_results import S9CommandEnvelopeIn
+from src.ingestion.command_result_service import persist_command_result
 from src.ratelimit import ingest_rate_limit
 from src.ingestion.service import (IngestDecision, canonical_hash, claim_or_resolve,
                                    mark_stored, route_stream, verify_scope)
@@ -126,7 +135,7 @@ async def ingest(
 
     # Legacy batch wrapper (no top-level stream, has messages[]) -> adapter path.
     if is_batch_body(body):
-        return await _ingest_batch(body, session, gw)
+        return await _ingest_batch(body, session, gw, influx)
 
     stream = body.get("stream") if isinstance(body, dict) else None
     route = route_stream(stream if isinstance(stream, str) else "")
@@ -157,7 +166,20 @@ async def ingest(
                      record_count=envelope.record_count)
 
 
-async def _ingest_batch(body, session, gw) -> JSONResponse:
+# Batch routing: S3-S9 -> dedicated per-stream persisters (Option C). Separate from the
+# single-message _STRUCTURED_HANDLERS below, which stays S3/S4/S8 only (unchanged).
+_BATCH_DEDICATED = {
+    "S3": (S3HealthEnvelopeIn, persist_health_message),
+    "S4": (S4AlarmEnvelopeIn, persist_alarm_events),
+    "S5": (S5ControllerEnvelopeIn, persist_controller_state),
+    "S6": (S6SolisEnvelopeIn, persist_solis_telemetry),
+    "S7": (S7EdgeAiEnvelopeIn, persist_edge_ai_inference),
+    "S8": (S8ConfigAuditEnvelopeIn, persist_config_audit),
+    "S9": (S9CommandEnvelopeIn, persist_command_result),
+}
+
+
+async def _ingest_batch(body, session, gw, influx) -> JSONResponse:
     """Legacy TransportBatch adapter. Returns the gateway's ACK contract (HTTP 200 with
     accepted[]/rejected[]). fast_bess_telemetry -> S1 structured JSONB, stored verbatim;
     unsupported streams and bad messages -> rejected with retryable:true so the gateway
@@ -191,7 +213,12 @@ async def _ingest_batch(body, session, gw) -> JSONResponse:
 
         try:
             code = canonical.get("stream")
-            envelope_cls = S1FastBessEnvelopeIn if code == "S1" else GenericStreamEnvelopeIn
+            if code == "S1":
+                envelope_cls = S1FastBessEnvelopeIn
+            elif code in _BATCH_DEDICATED:            # S3-S9 use their stream-specific envelope
+                envelope_cls = _BATCH_DEDICATED[code][0]
+            else:                                     # S2, S10, other generic
+                envelope_cls = GenericStreamEnvelopeIn
             envelope = envelope_cls(**canonical)
         except (ValidationError, TypeError, ValueError) as e:
             _reject(canonical.get("message_id"), "invalid_payload",
@@ -207,9 +234,21 @@ async def _ingest_batch(body, session, gw) -> JSONResponse:
             continue
 
         try:
-            persist = persist_fast_bess_message if code == "S1" else persist_stream_message
-            decision = await persist(
-                session, gw=gw, identity=identity, envelope=envelope)
+            if code == "S1":                              # S1 -> PostgreSQL JSONB only
+                decision = await persist_fast_bess_message(
+                    session, gw=gw, identity=identity, envelope=envelope)
+            elif code == "S2":                            # S2 -> InfluxDB only (ledger in PG)
+                points = build_influx_points(envelope, identity, influx.settings)
+                decision = await persist_influx_only(
+                    session, gw=gw, identity=identity, envelope=envelope,
+                    influx=influx, influx_points=points)
+            elif code in _BATCH_DEDICATED:                # S3-S9 -> dedicated per-stream table
+                _persist = _BATCH_DEDICATED[code][1]
+                decision = await _persist(
+                    session, gw=gw, identity=identity, envelope=envelope)
+            else:                                         # S10 + other generic -> stream_records (verbatim)
+                decision = await persist_stream_message(
+                    session, gw=gw, identity=identity, envelope=envelope)
         except InvalidValue as e:
             _reject(str(envelope.message_id), "invalid_payload", str(e), retryable=True)
             continue

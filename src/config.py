@@ -20,6 +20,15 @@ class Settings(BaseSettings):
     redis_url: str
     jwt_secret: str
 
+    # --- CORS (browser frontend). Bearer auth lives in the Authorization header, so
+    # cookies/credentials are NOT needed: allow_credentials stays False and wildcard is
+    # forbidden outside dev. Origins are comma-separated env strings, configured per env;
+    # production domains are never hardcoded. Dev localhost origins are kept separate.
+    cors_allowed_origins: str = ""      # staging/prod allowlist, comma-separated
+    cors_dev_origins: str = ("http://localhost:3000,http://127.0.0.1:3000,"
+                             "http://localhost:5173,http://127.0.0.1:5173")
+    cors_allow_credentials: bool = False
+
     # 9b-ii-c live-ingestion gate (default OFF; record contract still PROVISIONAL)
     ingest_enabled: bool = False
 
@@ -166,6 +175,29 @@ class Settings(BaseSettings):
             raise ValueError(
                 "otp_challenge_retention_seconds must be >= otp_verify_cap_window_seconds")
         return self
+
+    @model_validator(mode="after")
+    def _cors_wildcard_guard(self):
+        origins = _split_origins(self.cors_allowed_origins) + _split_origins(self.cors_dev_origins)
+        if "*" in origins:
+            if self.cors_allow_credentials:
+                raise ValueError("CORS wildcard '*' cannot be combined with credentials")
+            if self.env.lower() not in {"dev", "local", "test"}:
+                raise ValueError("CORS wildcard '*' is not allowed outside dev")
+        return self
+
+
+def _split_origins(value: str) -> list[str]:
+    return [x.strip() for x in (value or "").split(",") if x.strip()]
+
+
+def resolve_cors_origins(settings: "Settings") -> list[str]:
+    """Dev/local/test get the localhost dev origins (plus any extra allowlist); staging and
+    production get ONLY the explicitly configured allowlist (no dev origins, no wildcard)."""
+    allow = _split_origins(settings.cors_allowed_origins)
+    if settings.env.lower() in {"dev", "local", "test"}:
+        return list(dict.fromkeys(_split_origins(settings.cors_dev_origins) + allow))
+    return allow
 
 
 @lru_cache

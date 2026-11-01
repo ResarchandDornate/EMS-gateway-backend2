@@ -1,0 +1,109 @@
+name: ems-gateway-staging
+
+# ISOLATED STAGING STACK. Does NOT touch the production project:
+# distinct project name, network, volumes and host ports; no public-ingress proxy; no production
+# hosts/volumes/secrets. Start/stop (secrets come from .env.staging, which is gitignored):
+#   docker compose -f docker-compose.staging.yml --env-file .env.staging up -d --build
+#   docker compose -f docker-compose.staging.yml --env-file .env.staging down          # keeps volumes
+#   docker compose -f docker-compose.staging.yml --env-file .env.staging down -v        # staging volumes ONLY
+
+networks:
+  ems-staging-net:
+    name: ems-staging-net
+
+services:
+  postgres:
+    image: postgres:16
+    environment:
+      POSTGRES_USER: ems_staging
+      POSTGRES_DB: ems_staging
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env.staging}
+    ports: ["5437:5432"]
+    networks: [ems-staging-net]
+    volumes: [pgdata_staging:/var/lib/postgresql/data]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ems_staging -d ems_staging"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+  influxdb:
+    image: influxdb:2.7
+    environment:
+      DOCKER_INFLUXDB_INIT_MODE: setup
+      DOCKER_INFLUXDB_INIT_USERNAME: admin
+      DOCKER_INFLUXDB_INIT_PASSWORD: ${INFLUXDB_ADMIN_PASSWORD:?set INFLUXDB_ADMIN_PASSWORD in .env.staging}
+      DOCKER_INFLUXDB_INIT_ORG: unityess_staging
+      DOCKER_INFLUXDB_INIT_BUCKET: telemetry_1y_staging
+      DOCKER_INFLUXDB_INIT_RETENTION: 365d
+      DOCKER_INFLUXDB_INIT_ADMIN_TOKEN: ${INFLUXDB_ADMIN_TOKEN:?set INFLUXDB_ADMIN_TOKEN in .env.staging}
+    ports: ["8087:8086"]
+    networks: [ems-staging-net]
+    volumes: [influxdata_staging:/var/lib/influxdb2]
+    healthcheck:
+      test: ["CMD", "influx", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+  influx-init:
+    image: influxdb:2.7
+    depends_on:
+      influxdb: { condition: service_healthy }
+    networks: [ems-staging-net]
+    restart: "no"
+    entrypoint: ["/bin/sh", "-c"]
+    command:
+      - >
+        influx bucket create --host http://influxdb:8086
+        --token ${INFLUXDB_ADMIN_TOKEN:?set INFLUXDB_ADMIN_TOKEN in .env.staging}
+        --org unityess_staging --name telemetry_raw_90d_staging --retention 90d
+        || echo "telemetry_raw_90d_staging already exists"
+
+  redis:
+    image: redis:7
+    command: ["redis-server", "--appendonly", "yes", "--appendfsync", "everysec"]
+    ports: ["6381:6379"]
+    networks: [ems-staging-net]
+    volumes: [redisdata_staging:/data]
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+  api:
+    build: .
+    env_file: .env.staging
+    environment:
+      ENV: staging
+      INGEST_ENABLED: "false"                    # staging ingestion OFF by default (explicit operator action to enable)
+      DATABASE_URL: postgresql+asyncpg://ems_staging:${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env.staging}@postgres:5432/ems_staging
+      INFLUX_URL: http://influxdb:8086
+      INFLUX_TOKEN: ${INFLUXDB_ADMIN_TOKEN:?set INFLUXDB_ADMIN_TOKEN in .env.staging}
+      INFLUX_ORG: unityess_staging
+      INFLUX_BUCKET_RAW: telemetry_raw_90d_staging
+      INFLUX_BUCKET_LONG: telemetry_1y_staging
+      INFLUX_BUCKET_3Y: telemetry_3y_staging
+      REDIS_URL: redis://redis:6379/0
+      CORS_ALLOWED_ORIGINS: ${CORS_ALLOWED_ORIGINS:?set explicit staging frontend origin(s) in .env.staging}
+      CORS_ALLOW_CREDENTIALS: "false"
+    # Serve the wrapped ASGI entrypoint (RequestContextMiddleware + CORS), mirroring the Dockerfile.
+    command: ["sh", "-c", "alembic upgrade head && uvicorn src.main:asgi_app --host 0.0.0.0 --port 8000 --proxy-headers --forwarded-allow-ips='*' --workers 2"]
+    ports: ["8041:8000"]
+    networks: [ems-staging-net]
+    depends_on:
+      postgres: { condition: service_healthy }
+      redis: { condition: service_healthy }
+      influxdb: { condition: service_healthy }
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/health')"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+
+volumes:
+  pgdata_staging:
+  influxdata_staging:
+  redisdata_staging:

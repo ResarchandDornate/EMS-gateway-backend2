@@ -15,4 +15,4 @@ COPY src ./src
 
 EXPOSE 8000
 # apply pending migrations, then serve
-CMD ["sh", "-c", "alembic upgrade head && uvicorn src.main:app --host 0.0.0.0 --port 8000 --proxy-headers --forwarded-allow-ips='*' --workers 2"]
+CMD ["sh", "-c", "alembic upgrade head && uvicorn src.main:asgi_app --host 0.0.0.0 --port 8000 --proxy-headers --forwarded-allow-ips='*' --workers 2"]

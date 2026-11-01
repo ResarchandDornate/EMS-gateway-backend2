@@ -1,15 +1,22 @@
-"""Regression tests for the legacy TransportBatch adapter on POST /api/v1/gateway/ingest.
+"""ARCHITECTURE CONFORMANCE: every gateway stream lands in its correct store.
 
-New behaviour (confirmed against the Kalpa backend pack):
-  * fast_bess_telemetry -> S1 structured JSONB, stored VERBATIM (mixed-type nested
-    per-signal objects: bool/str/null/list preserved); no explode, no registry lookup.
-  * Response is the gateway's ACK contract: HTTP 200 with accepted[]/rejected[].
-  * Unsupported streams (and bad messages) -> rejected with retryable:true (kept by the
-    gateway, no data loss). Nothing is permanently rejected.
-  * `accepted` is emitted only after the row is committed.
-The single-message endpoint and numeric routing are unchanged.
+Decided architecture:
+  S1  fast_bess_telemetry        -> PostgreSQL JSONB  (fast_bess_records)   [mixed-type]
+  S2  general_asset_telemetry    -> InfluxDB ONLY      (time-series)         [numeric]
+  S3  gateway_health             -> PostgreSQL JSONB  (gateway_health_records)     [dedicated]
+  S4  alarms_events              -> PostgreSQL JSONB  (alarm_event_records)        [dedicated]
+  S5  soc_controller             -> PostgreSQL JSONB  (controller_state_records)   [dedicated]
+  S6  solis                      -> PostgreSQL JSONB  (solis_telemetry_records)    [dedicated]
+  S7  edge_ai                    -> PostgreSQL JSONB  (edge_ai_inference_records)  [dedicated]
+  S8  configuration_audit        -> PostgreSQL JSONB  (configuration_audit_records)[dedicated]
+  S9  command_results            -> PostgreSQL JSONB  (command_result_records)     [dedicated]
+  S10 battery_charge_discharge   -> PostgreSQL JSONB  (stream_records)  [generic; unconfirmed]
+  S2/combiner_box_meter          -> EXCLUDED (not stored)
+  anything else                  -> rejected, retryable (kept by gateway)
 
-Gate OFF by default; flipped here via a get_settings override. No Influx needed.
+Every test asserts the record is in the RIGHT store AND absent from the wrong ones.
+Gate OFF by default; flipped via a get_settings override. Influx is an in-process stub
+that records writes, so no Influx server is needed.
 """
 import types as _types
 import uuid
@@ -23,6 +30,13 @@ from src.influx import RegistryIndex
 from src.ingestion.models import IngestMessageModel
 from src.ingestion.fast_bess_models import FastBessRecordModel
 from src.ingestion.stream_models import StreamRecordModel
+from src.ingestion.health_models import GatewayHealthRecordModel
+from src.ingestion.alarm_models import AlarmEventRecordModel
+from src.ingestion.controller_models import ControllerStateRecordModel
+from src.ingestion.solis_models import SolisTelemetryRecordModel
+from src.ingestion.edge_ai_models import EdgeAiInferenceRecordModel
+from src.ingestion.config_audit_models import ConfigurationAuditRecordModel
+from src.ingestion.command_result_models import CommandResultRecordModel
 from src.ingestion.providers import (get_influx_gateway, get_registry_index,
                                       reset_registry_cache)
 from src.tenancy.gateways.models import GatewayModel
@@ -60,11 +74,12 @@ class _StubInflux:
 def enabled():
     from src.main import app
     enabled_settings = get_settings().model_copy(update={"ingest_enabled": True})
+    stub = _StubInflux()
     app.dependency_overrides[get_settings] = lambda: enabled_settings
     app.dependency_overrides[get_registry_index] = lambda: RegistryIndex.from_rows([])
-    app.dependency_overrides[get_influx_gateway] = lambda: _StubInflux()
+    app.dependency_overrides[get_influx_gateway] = lambda: stub
     reset_registry_cache()
-    yield app
+    yield app, stub
     for dep in (get_settings, get_registry_index, get_influx_gateway):
         app.dependency_overrides.pop(dep, None)
     reset_registry_cache()
@@ -83,155 +98,247 @@ def _auth(gw):
     return {"Authorization": f"Bearer {create_gateway_token(gw.id)}"}
 
 
+# --- message builders (as the real gateway sends) ---
 def _sig(value, quality="good"):
-    # one per-signal object, as the real gateway emits
     return {"value": value, "unit": None, "quality": quality, "category": "normalized_fast",
             "display_name": None, "updated_utc": TS_Z, "age_ms": None}
 
 
-def _nested_rec(*, source_id="external_ems_1", bess_id="bess_1"):
-    # mixed types: bool, str, null, list, float, int - all must survive verbatim
-    return {
-        "schema_version": 1, "record_type": "fast_bess_sample", "sample_source": "cache",
-        "timestamp_utc": TS_Z, "source_id": source_id, "bess_id": bess_id,
-        "pcs_asset_id": f"{source_id}_pcs", "bms_asset_id": f"{source_id}_bms",
-        "quality": "good",
-        "pcs_values": {
-            "running": _sig(False), "charging": _sig(None), "active_power_kw": _sig(0.0),
-            "raw_status": _sig(0),
-        },
-        "bms_values": {
-            "state": _sig("Normal"), "blocking_reasons": _sig([]), "soh": _sig(98.2),
-        },
-    }
+def _s1_rec():
+    return {"record_type": "fast_bess_sample", "timestamp_utc": TS_Z,
+            "source_id": "external_ems_1", "bess_id": "bess_1",
+            "pcs_asset_id": "ems1_pcs", "bms_asset_id": "ems1_bms", "quality": "good",
+            "pcs_values": {"running": _sig(False), "active_power_kw": _sig(0.0),
+                           "charging": _sig(None)},
+            "bms_values": {"state": _sig("Normal"), "blocking_reasons": _sig([]),
+                           "soh": _sig(98.2)}}
 
 
-def _legacy_msg(records, *, message_id=None, sequence=0, stream="fast_bess_telemetry",
-                priority="P2"):
-    return {"schema_version": "1.0", "message_id": str(message_id or uuid.uuid4()),
-            "gateway_id": "kalpa-ems-gateway-001", "site_id": "kalpa",   # must be ignored
-            "stream": stream, "substream": "bess_fast", "sequence": sequence,
-            "created_at_utc": TS, "record_count": len(records), "priority": priority,
-            "records": records}
+def _s2_rec(signal="rack_operating_state", value=2):
+    return {"record_type": "general_asset_signal", "source_id": "lineage_source",
+            "runtime_asset_id": "rack_1", "signal": signal, "value": value,
+            "unit": None, "quality": "good", "source_updated_utc": TS_Z}
 
 
-def _batch(messages, *, request_id="req-1"):
-    return {"request_id": request_id, "gateway_id": "kalpa-ems-gateway-001",
+def _generic_rec():
+    return {"source_id": "src", "timestamp_utc": TS_Z, "flag": True, "note": "hello",
+            "nested": {"a": 1}, "list": [1, 2], "null_field": None}
+
+
+def _s3_valid():
+    return {"status": "ok", "timestamp_utc": TS_Z, "gateway_mode": "ems_read_write",
+            "source_count": 2, "asset_count": 18, "online_asset_count": 18,
+            "total_signal_count": 2844, "bad_signal_count": 0, "commands_enabled": True,
+            "control_enabled": True, "storage_can_write": True,
+            "storage": {"enabled": True, "type": "sqlite", "reasons": []}}
+
+def _s4_valid():
+    return {"event_id": str(uuid.uuid4()), "timestamp_utc": TS_Z, "gateway_id": "k",
+            "site_id": "k", "source_id": "pcs1", "event_type": "over_voltage",
+            "severity": "Critical", "state": "ACTIVE", "message": "x", "dedupe_key": "ov:ACTIVE"}
+
+def _s5_valid():
+    return {"timestamp_utc": TS_Z, "mode": "auto", "healthy": True,
+            "controller": {"state": "IDLE", "previous_state": "CHARGING", "decision": "hold"}}
+
+def _s6_valid():
+    return {"timestamp_utc": TS_Z, "solis": {"state": "running"}, "power": 12.3}
+
+def _s7_valid():
+    return {"cycle_time": TS_Z, "model_info": {"name": "anom-v1"}, "sources": [], "key_features": {}}
+
+def _s8_valid():
+    return {"audit_id": str(uuid.uuid4()), "timestamp_utc": TS_Z, "gateway_id": "k", "site_id": "k",
+            "actor": "admin", "actor_role": "org_admin", "change_source": "local_api",
+            "setting_path": "soc.max", "old_value": 80, "new_value": 90, "revision": 3,
+            "reason": None, "correlation_id": None}
+
+def _s9_valid():
+    return {"command_id": str(uuid.uuid4()), "gateway_id": "k", "site_id": "k",
+            "requested_at_utc": TS_Z, "received_at_utc": TS_Z, "requested_by": "admin",
+            "requested_role": "org_admin", "command_type": "set_soc_limit", "requested_value": 90,
+            "gateway_validation_ok": True, "readback_requested": False, "verified": None,
+            "final_status": "accepted"}
+
+
+def _msg(stream, substream, records, *, message_id=None, sequence=0):
+    m = {"schema_version": "1.0", "message_id": str(message_id or uuid.uuid4()),
+         "gateway_id": "kalpa-ems-gateway-001", "site_id": "kalpa",  # ignored
+         "stream": stream, "sequence": sequence, "created_at_utc": TS,
+         "record_count": len(records), "priority": "P2", "records": records}
+    if substream is not None:
+        m["substream"] = substream
+    return m
+
+
+def _batch(messages):
+    return {"request_id": "req-1", "gateway_id": "kalpa-ems-gateway-001",
             "sent_at_utc": TS, "messages": messages}
 
 
-async def _ledger_count(session):
+async def _ledger(session):
     return (await session.execute(select(func.count()).select_from(IngestMessageModel))).scalar()
 
-
-async def _fb_rows(session):
+async def _fb(session):
     return (await session.execute(select(FastBessRecordModel))).scalars().all()
 
+async def _sr(session):
+    return (await session.execute(select(StreamRecordModel))).scalars().all()
 
-# ---------------- S1 verbatim store + ACK accepted ----------------
+def _points(stub):
+    return [p for w in stub.writes for p in w]
 
-async def test_s1_nested_stored_verbatim_accepted(client, session, enabled):
+
+# ===================== S1 -> PostgreSQL JSONB (not Influx) =====================
+
+async def test_S1_fast_bess_goes_to_postgres_jsonb_only(client, session, enabled):
     c, _ = client
+    app, stub = enabled
     org, site, gw = await _mk(session)
     mid = uuid.uuid4()
-    r = await c.post(URL, json=_batch([_legacy_msg([_nested_rec()], message_id=mid, sequence=7)]),
+    r = await c.post(URL, json=_batch([_msg("fast_bess_telemetry", "bess_fast", [_s1_rec()],
+                                            message_id=mid)]), headers=_auth(gw))
+    assert r.status_code == 200, r.text
+    assert r.json()["accepted"] == [{"message_id": str(mid), "status": "accepted"}]
+    fb = await _fb(session)
+    assert len(fb) == 1                           # row exists in fast_bess_records
+    assert fb[0].gateway_id == gw.id and fb[0].payload["bms_values"]["state"]["value"] == "Normal"
+    assert len(await _sr(session)) == 0          # NOT in the generic Postgres table
+    assert _points(stub) == []                   # NOT in Influx
+
+
+# ===================== S2 -> InfluxDB only (not Postgres rows) =====================
+
+async def test_S2_telemetry_goes_to_influx_only(client, session, enabled):
+    c, _ = client
+    app, stub = enabled
+    org, site, gw = await _mk(session)
+    mid = uuid.uuid4()
+    r = await c.post(URL, json=_batch([_msg("general_asset_telemetry", "bms_extended",
+                                            [_s2_rec(), _s2_rec("soc", 55)], message_id=mid)]),
                      headers=_auth(gw))
     assert r.status_code == 200, r.text
-    body = r.json()
-    assert body["rejected"] == []
-    assert body["accepted"] == [{"message_id": str(mid), "status": "accepted"}]
-    # one ledger row + one fast_bess row; identity stamped from token, not "kalpa-*"
-    assert await _ledger_count(session) == 1
-    rows = await _fb_rows(session)
-    assert len(rows) == 1
-    row = rows[0]
-    assert row.gateway_id == gw.id and row.message_id == mid and row.record_index == 0
-    assert row.source_id == "external_ems_1" and row.bess_id == "bess_1"
-    # verbatim payload: bool / null / list / str / numbers all preserved exactly
-    p = row.payload
-    assert p["pcs_values"]["running"]["value"] is False
-    assert p["pcs_values"]["charging"]["value"] is None
-    assert p["bms_values"]["state"]["value"] == "Normal"
-    assert p["bms_values"]["blocking_reasons"]["value"] == []
-    assert p["bms_values"]["soh"]["value"] == 98.2
+    assert r.json()["accepted"] == [{"message_id": str(mid), "status": "accepted"}]
+    assert len(_points(stub)) == 2               # two numeric signals -> two Influx points
+    assert len(await _sr(session)) == 0          # NOT in Postgres stream_records
+    assert len(await _fb(session)) == 0          # NOT in fast_bess
+    assert await _ledger(session) == 1           # ledger still records it (idempotency)
 
 
-async def test_s1_multi_record_rows(client, session, enabled):
+# ===================== S3-S9 -> dedicated per-stream tables (not generic, not Influx) =====================
+
+_DEDICATED = {
+    "S3": ("gateway_health", "gateway", _s3_valid, GatewayHealthRecordModel),
+    "S4": ("alarms_events", "events", _s4_valid, AlarmEventRecordModel),
+    "S5": ("soc_controller", "controller", _s5_valid, ControllerStateRecordModel),
+    "S6": ("solis", "solis", _s6_valid, SolisTelemetryRecordModel),
+    "S7": ("edge_ai", "per_bess", _s7_valid, EdgeAiInferenceRecordModel),
+    "S8": ("configuration_audit", "gateway", _s8_valid, ConfigurationAuditRecordModel),
+    "S9": ("command_results", "commands", _s9_valid, CommandResultRecordModel),
+}
+
+
+async def _count(session, model):
+    return (await session.execute(select(func.count()).select_from(model))).scalar()
+
+
+@pytest.mark.parametrize("code", list(_DEDICATED))
+async def test_structured_streams_go_to_dedicated_tables(client, session, enabled, code):
     c, _ = client
+    app, stub = enabled
     org, site, gw = await _mk(session)
-    msg = _legacy_msg([_nested_rec(bess_id="bess_1"), _nested_rec(bess_id="bess_2")],
-                      message_id=uuid.uuid4())
-    r = await c.post(URL, json=_batch([msg]), headers=_auth(gw))
+    legacy, substream, make, model = _DEDICATED[code]
+    mid = uuid.uuid4()
+    r = await c.post(URL, json=_batch([_msg(legacy, substream, [make()], message_id=mid)]),
+                     headers=_auth(gw))
     assert r.status_code == 200, r.text
-    assert r.json()["accepted"][0]["status"] == "accepted"
-    rows = await _fb_rows(session)
-    assert len(rows) == 2 and {x.record_index for x in rows} == {0, 1}
+    assert r.json()["accepted"] == [{"message_id": str(mid), "status": "accepted"}], r.json()
+    assert await _count(session, model) == 1          # landed in its DEDICATED table
+    assert len(await _sr(session)) == 0               # NOT in generic stream_records
+    assert len(await _fb(session)) == 0               # NOT in fast_bess
+    assert _points(stub) == []                        # NOT in Influx
 
 
-async def test_s1_duplicate_already_processed(client, session, enabled):
+async def test_S10_unconfirmed_stays_in_stream_records(client, session, enabled):
     c, _ = client
+    app, stub = enabled
     org, site, gw = await _mk(session)
-    batch = _batch([_legacy_msg([_nested_rec()], message_id=uuid.uuid4())])
-    r1 = await c.post(URL, json=batch, headers=_auth(gw)); assert r1.status_code == 200, r1.text
-    assert r1.json()["accepted"][0]["status"] == "accepted"
-    r2 = await c.post(URL, json=batch, headers=_auth(gw)); assert r2.status_code == 200, r2.text
-    assert r2.json()["accepted"][0]["status"] == "already_processed"
-    assert await _ledger_count(session) == 1 and len(await _fb_rows(session)) == 1
+    mid = uuid.uuid4()
+    r = await c.post(URL, json=_batch([_msg("battery_charge_discharge_control", "pair_controller",
+                                            [_generic_rec()], message_id=mid)]), headers=_auth(gw))
+    assert r.status_code == 200, r.text
+    assert r.json()["accepted"] == [{"message_id": str(mid), "status": "accepted"}]
+    sr = await _sr(session)
+    assert len(sr) == 1 and sr[0].stream == "S10" and sr[0].payload["flag"] is True  # verbatim
+    assert _points(stub) == [] and len(await _fb(session)) == 0
 
 
-# ---------------- unsupported streams -> retryable reject, nothing lost ----------------
+# ===================== exclusions & rejections (no data loss) =====================
+
+async def test_S2_combiner_box_meter_excluded(client, session, enabled):
+    c, _ = client
+    app, stub = enabled
+    org, site, gw = await _mk(session)
+    r = await c.post(URL, json=_batch([_msg("general_asset_telemetry", "combiner_box_meter",
+                                            [_s2_rec()], message_id=uuid.uuid4())]), headers=_auth(gw))
+    assert r.status_code == 200, r.text
+    assert r.json()["accepted"] == []
+    rej = r.json()["rejected"][0]
+    assert rej["error_code"] == "substream_excluded" and rej["retryable"] is True
+    assert len(await _sr(session)) == 0 and len(await _fb(session)) == 0 and _points(stub) == []
+
 
 async def test_unsupported_stream_retryable_reject(client, session, enabled):
     c, _ = client
+    app, _stub = enabled
     org, site, gw = await _mk(session)
-    r = await c.post(URL, json=_batch([_legacy_msg([{"x": 1}], message_id=uuid.uuid4(),
-                                                   stream="totally_unknown_stream")]),
-                     headers=_auth(gw))
-    assert r.status_code == 200, r.text
-    body = r.json()
-    assert body["accepted"] == []
-    rej = body["rejected"][0]
-    assert rej["error_code"] == "stream_not_yet_supported" and rej["retryable"] is True
-    assert await _ledger_count(session) == 0 and len(await _fb_rows(session)) == 0
-
-
-async def test_missing_message_id_retryable_reject(client, session, enabled):
-    c, _ = client
-    org, site, gw = await _mk(session)
-    bad = {"schema_version": "1.0", "gateway_id": "kalpa", "site_id": "kalpa",
-           "stream": "fast_bess_telemetry", "substream": "bess_fast", "sequence": 1,
-           "created_at_utc": TS, "records": [_nested_rec()]}      # no message_id
-    r = await c.post(URL, json=_batch([bad]), headers=_auth(gw))
+    r = await c.post(URL, json=_batch([_msg("some_future_stream", "x", [{"a": 1}],
+                                            message_id=uuid.uuid4())]), headers=_auth(gw))
     assert r.status_code == 200, r.text
     assert r.json()["accepted"] == []
+    assert r.json()["rejected"][0]["error_code"] == "stream_not_yet_supported"
     assert r.json()["rejected"][0]["retryable"] is True
-    assert await _ledger_count(session) == 0
+    assert await _ledger(session) == 0
 
 
-async def test_mixed_batch_good_and_unsupported(client, session, enabled):
+async def test_S2_missing_substream_rejected(client, session, enabled):
     c, _ = client
+    app, _stub = enabled
     org, site, gw = await _mk(session)
-    good = uuid.uuid4()
-    batch = _batch([
-        _legacy_msg([_nested_rec()], message_id=good, sequence=1),
-        _legacy_msg([{"x": 1}], message_id=uuid.uuid4(), sequence=2, stream="totally_unknown_stream"),
-    ])
-    r = await c.post(URL, json=batch, headers=_auth(gw))
+    r = await c.post(URL, json=_batch([_msg("general_asset_telemetry", None, [_s2_rec()],
+                                            message_id=uuid.uuid4())]), headers=_auth(gw))
     assert r.status_code == 200, r.text
-    body = r.json()
-    assert body["accepted"] == [{"message_id": str(good), "status": "accepted"}]
-    assert len(body["rejected"]) == 1 and body["rejected"][0]["error_code"] == "stream_not_yet_supported"
-    rows = await _fb_rows(session)
-    assert len(rows) == 1 and rows[0].message_id == good
+    assert r.json()["accepted"] == [] and r.json()["rejected"][0]["retryable"] is True
 
 
-# ---------------- structural failures + single-message routing unchanged ----------------
+async def test_missing_message_id_rejected(client, session, enabled):
+    c, _ = client
+    app, _stub = enabled
+    org, site, gw = await _mk(session)
+    bad = {"schema_version": "1.0", "gateway_id": "k", "site_id": "k",
+           "stream": "fast_bess_telemetry", "substream": "bess_fast", "sequence": 1,
+           "created_at_utc": TS, "records": [_s1_rec()]}
+    r = await c.post(URL, json=_batch([bad]), headers=_auth(gw))
+    assert r.status_code == 200, r.text
+    assert r.json()["accepted"] == [] and r.json()["rejected"][0]["retryable"] is True
+
+
+# ===================== idempotency & structural =====================
+
+async def test_S1_duplicate_already_processed(client, session, enabled):
+    c, _ = client
+    app, stub = enabled
+    org, site, gw = await _mk(session)
+    batch = _batch([_msg("fast_bess_telemetry", "bess_fast", [_s1_rec()], message_id=uuid.uuid4())])
+    r1 = await c.post(URL, json=batch, headers=_auth(gw)); assert r1.json()["accepted"][0]["status"] == "accepted"
+    r2 = await c.post(URL, json=batch, headers=_auth(gw)); assert r2.json()["accepted"][0]["status"] == "already_processed"
+    assert len(await _fb(session)) == 1 and await _ledger(session) == 1
+
 
 async def test_batch_empty_messages_422(client, session, enabled):
     c, _ = client
     _, _, gw = await _mk(session)
-    r = await c.post(URL, json=_batch([]), headers=_auth(gw))
-    assert r.status_code == 422
+    assert (await c.post(URL, json=_batch([]), headers=_auth(gw))).status_code == 422
 
 async def test_batch_malformed_json_400(client, session, enabled):
     c, _ = client
@@ -239,122 +346,38 @@ async def test_batch_malformed_json_400(client, session, enabled):
     r = await c.post(URL, content=b"{not json", headers={**_auth(gw), "Content-Type": "application/json"})
     assert r.status_code == 400
 
-async def test_single_unknown_stream_still_422(client, session, enabled):
+async def test_single_envelope_unknown_stream_422(client, session, enabled):
     c, _ = client
     _, _, gw = await _mk(session)
-    body = {"schema_version": "1.0", "message_id": str(uuid.uuid4()),
-            "gateway_id": str(gw.id), "site_id": "x", "organization_id": "x",
-            "stream": "weird", "substream": "bess_fast", "sequence": 0,
-            "created_at_utc": TS, "record_count": 0, "records": []}
-    r = await c.post(URL, json=body, headers=_auth(gw))
-    assert r.status_code == 422
+    body = {"schema_version": "1.0", "message_id": str(uuid.uuid4()), "gateway_id": str(gw.id),
+            "site_id": "x", "organization_id": "x", "stream": "weird", "substream": "bess_fast",
+            "sequence": 0, "created_at_utc": TS, "record_count": 0, "records": []}
+    assert (await c.post(URL, json=body, headers=_auth(gw))).status_code == 422
 
-async def test_body_without_stream_or_messages_422(client, session, enabled):
+
+# ===================== one mixed batch routes each stream correctly =====================
+
+async def test_mixed_batch_routes_each_stream(client, session, enabled):
     c, _ = client
-    _, _, gw = await _mk(session)
-    r = await c.post(URL, json={"foo": "bar"}, headers=_auth(gw))
-    assert r.status_code == 422
-    assert await _ledger_count(session) == 0
-
-# ================= S2..S10 generic verbatim store =================
-
-def _gen_msg(stream, substream, records, *, message_id=None, sequence=0):
-    return {"schema_version": "1.0", "message_id": str(message_id or uuid.uuid4()),
-            "gateway_id": "kalpa-ems-gateway-001", "site_id": "kalpa",
-            "stream": stream, "substream": substream, "sequence": sequence,
-            "created_at_utc": TS, "record_count": len(records), "priority": "P1",
-            "records": records}
-
-
-async def _sr_rows(session):
-    return (await session.execute(select(StreamRecordModel))).scalars().all()
-
-
-async def test_s2_bms_extended_stored_verbatim(client, session, enabled):
-    c, _ = client
+    app, stub = enabled
     org, site, gw = await _mk(session)
-    mid = uuid.uuid4()
-    rec = {"record_type": "general_asset_signal", "source_id": "lineage_source",
-           "runtime_asset_id": "rack_1", "point_id": "rack.rack_data.rack_operating_state",
-           "signal": "rack_operating_state", "value": 2, "unit": None, "quality": "good",
-           "source_updated_utc": TS_Z}
-    r = await c.post(URL, json=_batch([_gen_msg("general_asset_telemetry", "bms_extended",
-                                                [rec], message_id=mid)]), headers=_auth(gw))
+    s1, s2, s4, s10 = (uuid.uuid4() for _ in range(4))
+    batch = _batch([
+        _msg("fast_bess_telemetry", "bess_fast", [_s1_rec()], message_id=s1),
+        _msg("general_asset_telemetry", "pcs_extended", [_s2_rec("active_power_kw", 12.3)], message_id=s2),
+        _msg("alarms_events", "events", [_s4_valid()], message_id=s4),
+        _msg("battery_charge_discharge_control", "pair_controller", [_generic_rec()], message_id=s10),
+    ])
+    r = await c.post(URL, json=batch, headers=_auth(gw))
     assert r.status_code == 200, r.text
-    assert r.json()["accepted"] == [{"message_id": str(mid), "status": "accepted"}]
-    rows = await _sr_rows(session)
-    assert len(rows) == 1
-    row = rows[0]
-    assert row.gateway_id == gw.id and row.stream == "S2" and row.substream == "bms_extended"
-    assert row.source_id == "lineage_source"
-    assert row.payload["signal"] == "rack_operating_state" and row.payload["value"] == 2
-    assert len(await _fb_rows(session)) == 0          # S1 table untouched
-
-
-async def test_s10_control_stored(client, session, enabled):
-    c, _ = client
-    org, site, gw = await _mk(session)
-    rec = {"source_id": "ctrl", "pair_id": "pair_1", "command": "idle", "timestamp_utc": TS_Z}
-    r = await c.post(URL, json=_batch([_gen_msg("battery_charge_discharge_control",
-                                                "pair_controller", [rec], message_id=uuid.uuid4())]),
-                     headers=_auth(gw))
-    assert r.status_code == 200, r.text
-    assert r.json()["accepted"][0]["status"] == "accepted"
-    rows = await _sr_rows(session)
-    assert len(rows) == 1 and rows[0].stream == "S10"
-
-
-async def test_s3_health_stored_verbatim(client, session, enabled):
-    c, _ = client
-    org, site, gw = await _mk(session)
-    rec = {"status": "ok", "timestamp_utc": TS_Z, "gateway_mode": "normal",
-           "storage": {"can_write": True}, "sources": [{"id": "s1", "online": True}]}
-    r = await c.post(URL, json=_batch([_gen_msg("gateway_health", "gateway", [rec],
-                                                message_id=uuid.uuid4())]), headers=_auth(gw))
-    assert r.status_code == 200, r.text
-    assert r.json()["accepted"][0]["status"] == "accepted"
-    rows = await _sr_rows(session)
-    assert len(rows) == 1 and rows[0].stream == "S3"
-    assert rows[0].payload["storage"]["can_write"] is True
-    assert rows[0].payload["sources"] == [{"id": "s1", "online": True}]
-
-
-async def test_combiner_box_meter_excluded(client, session, enabled):
-    c, _ = client
-    org, site, gw = await _mk(session)
-    r = await c.post(URL, json=_batch([_gen_msg("general_asset_telemetry", "combiner_box_meter",
-                                                [{"x": 1}], message_id=uuid.uuid4())]),
-                     headers=_auth(gw))
-    assert r.status_code == 200, r.text
-    assert r.json()["accepted"] == []
-    rej = r.json()["rejected"][0]
-    assert rej["error_code"] == "substream_excluded" and rej["retryable"] is True
-    assert len(await _sr_rows(session)) == 0
-
-
-async def test_s2_missing_substream_rejected(client, session, enabled):
-    c, _ = client
-    org, site, gw = await _mk(session)
-    bad = {"schema_version": "1.0", "message_id": str(uuid.uuid4()), "gateway_id": "k",
-           "site_id": "k", "stream": "general_asset_telemetry", "sequence": 1,
-           "created_at_utc": TS, "records": [{"x": 1}]}
-    r = await c.post(URL, json=_batch([bad]), headers=_auth(gw))
-    assert r.status_code == 200, r.text
-    assert r.json()["accepted"] == [] and r.json()["rejected"][0]["retryable"] is True
-    assert len(await _sr_rows(session)) == 0
-
-
-async def test_mixed_streams_s1_s2_s10(client, session, enabled):
-    c, _ = client
-    org, site, gw = await _mk(session)
-    s1 = _legacy_msg([_nested_rec()], message_id=uuid.uuid4())
-    s2 = _gen_msg("general_asset_telemetry", "pcs_extended",
-                  [{"source_id": "x", "signal": "soc", "value": 55}], message_id=uuid.uuid4())
-    s10 = _gen_msg("battery_charge_discharge_control", "pair_controller",
-                   [{"source_id": "c", "timestamp_utc": TS_Z}], message_id=uuid.uuid4())
-    r = await c.post(URL, json=_batch([s1, s2, s10]), headers=_auth(gw))
-    assert r.status_code == 200, r.text
-    assert len(r.json()["accepted"]) == 3 and r.json()["rejected"] == []
-    assert len(await _fb_rows(session)) == 1                       # S1
-    srs = await _sr_rows(session)
-    assert {x.stream for x in srs} == {"S2", "S10"}
+    assert {a["status"] for a in r.json()["accepted"]} == {"accepted"} and len(r.json()["accepted"]) == 4
+    assert r.json()["rejected"] == []
+    # S1 -> fast_bess_records
+    assert {x.message_id for x in await _fb(session)} == {s1}
+    # S4 -> dedicated alarm_event_records; only S10 remains in generic stream_records
+    sr = {x.stream: x.message_id for x in await _sr(session)}
+    assert sr == {"S10": s10}
+    alarms = (await session.execute(select(AlarmEventRecordModel))).scalars().all()
+    assert len(alarms) == 1 and alarms[0].message_id == s4
+    # S2 -> Influx only
+    assert len(_points(stub)) == 1

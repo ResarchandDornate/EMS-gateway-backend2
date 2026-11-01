@@ -5,8 +5,9 @@ from datetime import datetime, timedelta, timezone
 from src.influx import parse_contract_timestamp
 from src.streams import INGEST_STREAMS
 
-# Telemetry read supports exactly the ingest-eligible streams (single source: src/streams).
-SUPPORTED_STREAMS = INGEST_STREAMS
+# Influx telemetry reads expose S2 only; S1 is mixed-type and lives in Postgres
+# (fast_bess_records), so it is excluded from the Influx-backed read set.
+SUPPORTED_STREAMS = INGEST_STREAMS - frozenset({"S1"})
 MAX_WINDOW = timedelta(days=7)
 DEFAULT_LIMIT = 1000
 MAX_LIMIT = 5000
