@@ -7,7 +7,7 @@ re-enabled. The cache is keyed by the session's database identity (host, port, d
 index built from one database can never be served to a session bound to another (prod runs
 one registry DB per process; tests override get_registry_index and reset the cache).
 """
-from fastapi import Depends, HTTPException, status
+from fastapi import Depends, HTTPException, Request, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.config import Settings, get_settings
@@ -60,5 +60,10 @@ async def get_registry_index(
     return await load_cached_index(session)
 
 
-def get_influx_gateway(_gate=Depends(require_ingest_enabled)) -> InfluxGateway:
-    return InfluxGateway(get_settings())
+def get_influx_gateway(request: Request = None,
+                       _gate=Depends(require_ingest_enabled)) -> InfluxGateway:
+    # Reuse the app-lifespan shared Influx client (connection pool) when serving a request;
+    # fall back to a per-call client for direct/test callers with no request/app context.
+    state = getattr(getattr(request, "app", None), "state", None)
+    shared_client = getattr(state, "influx_client", None)
+    return InfluxGateway(get_settings(), client=shared_client)

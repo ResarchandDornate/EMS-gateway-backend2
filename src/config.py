@@ -17,6 +17,25 @@ class Settings(BaseSettings):
     influx_bucket_test: str = "telemetry_test"
     influx_bucket_3y: str = "telemetry_3y"
     influx_bucket_3y_retention_seconds: int = Field(default=94_608_000, gt=0)  # 1095 d (PROPOSED, not prod-approved)
+    # Explicit Influx connect/write timeout (ms). Bounds every S2 write so a hung
+    # connection fails fast and predictably instead of stalling the request. MUST stay
+    # below the ingest lease (service.LEASE_TTL_SECONDS = 60 s) so a single write can
+    # never outlive its lease and risk a lost-lease store. Default 20 s.
+    influx_timeout_ms: int = Field(default=20_000, gt=0)
+    # Forward-only, in-request recovery for S2 writes: on a TRANSIENT write failure, retry
+    # the Influx write a bounded number of times WHILE the request still holds the payload
+    # in memory, so a transient burst failure becomes a confirmed store instead of an
+    # abandoned 'pending' row. Operates only on the live request path: it never scans or
+    # mutates stored/pending ledger rows, so historical rows are untouched (no cutoff
+    # needed). Set influx_write_retries=0 to disable. The budget caps total retry wall-clock
+    # well under the 60 s lease and typical gateway HTTP timeout.
+    influx_write_retries: int = Field(default=2, ge=0)       # extra attempts after the first
+    # TOTAL operation deadline in ms, INCLUDING the first attempt (not just the retries). The
+    # whole write-and-retry operation is hard-capped at this value; each attempt runs under
+    # min(influx_timeout_ms, remaining-budget), so a single slow attempt is cancelled at the
+    # deadline. Set influx_timeout_ms <= this (divided by expected attempts) for per-attempt
+    # cuts to leave room for a retry. Must stay < the 60 s lease (validated below).
+    influx_retry_budget_ms: int = Field(default=5_000, gt=0)
     redis_url: str
     jwt_secret: str
 
@@ -92,6 +111,24 @@ class Settings(BaseSettings):
         v = (v or "").strip()
         if not v:
             raise ValueError("influx_bucket_3y must not be blank")
+        return v
+
+    @field_validator("influx_timeout_ms")
+    @classmethod
+    def _influx_timeout_below_lease(cls, v: int) -> int:
+        # Keep strictly below the 60 s ingest lease (service.LEASE_TTL_SECONDS) so a
+        # single Influx write can never outlive its lease.
+        if v >= 60_000:
+            raise ValueError("influx_timeout_ms must be < 60000 (below the 60 s ingest lease)")
+        return v
+
+    @field_validator("influx_retry_budget_ms")
+    @classmethod
+    def _influx_retry_budget_below_lease(cls, v: int) -> int:
+        # Total retry wall-clock must stay below the 60 s lease so retries cannot push a
+        # single message's processing past its lease.
+        if v >= 60_000:
+            raise ValueError("influx_retry_budget_ms must be < 60000 (below the 60 s ingest lease)")
         return v
 
     @field_validator("token_rate_capacity", "ingest_rate_capacity")

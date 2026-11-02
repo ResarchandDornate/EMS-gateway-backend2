@@ -1,6 +1,8 @@
 import asyncio
 from contextlib import asynccontextmanager
 
+import structlog
+from influxdb_client.client.influxdb_client_async import InfluxDBClientAsync
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
@@ -32,9 +34,27 @@ READY_PROBE_TIMEOUT_SECONDS = 3
 async def _lifespan(app: FastAPI):
     # Build the shared rate limiter (no-op unless rate_limit_enabled). Never fails startup.
     await init_rate_limiter(app)
+    # Shared Influx client: one connection pool reused across requests, so a burst does
+    # not open a fresh connection per S2 message (the condition behind client-side write
+    # failures). Never fail startup if it can't be built; providers fall back to a per-call
+    # client when app.state.influx_client is None.
+    app.state.influx_client = None
+    try:
+        _s = get_settings()
+        app.state.influx_client = InfluxDBClientAsync(
+            url=_s.influx_url, token=_s.influx_token, org=_s.influx_org,
+            timeout=int(getattr(_s, "influx_timeout_ms", 20_000)))
+    except Exception:
+        structlog.get_logger("startup").warning("influx_shared_client_init_failed")
     try:
         yield
     finally:
+        _client = getattr(app.state, "influx_client", None)
+        if _client is not None:
+            try:
+                await _client.close()
+            except Exception:
+                pass
         await shutdown_rate_limiter(app)
 
 
