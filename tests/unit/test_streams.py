@@ -42,10 +42,10 @@ def test_classifications_are_immutable_frozensets():
 def test_ingestion_and_telemetry_use_the_shared_classifications():
     # behavior/value: both expose the same vocabulary as the single source
     assert ingest_schemas.KNOWN_STREAMS == streams.KNOWN_STREAMS
-    assert telemetry_service.SUPPORTED_STREAMS == streams.INGEST_STREAMS
-    # drift guard (secondary): they are literally the shared objects
+    # S1 is Postgres-backed (fast_bess_records); Influx telemetry reads expose S2 only.
+    assert telemetry_service.SUPPORTED_STREAMS == streams.INGEST_STREAMS - frozenset({"S1"})
+    # drift guard (secondary): KNOWN_STREAMS is still the shared object
     assert ingest_schemas.KNOWN_STREAMS is streams.KNOWN_STREAMS
-    assert telemetry_service.SUPPORTED_STREAMS is streams.INGEST_STREAMS
 
 
 def test_route_stream_behavior_preserved():
@@ -64,6 +64,6 @@ def test_envelope_validation_behavior_preserved():
 
 
 def test_telemetry_supported_membership():
-    assert "S1" in telemetry_service.SUPPORTED_STREAMS
+    assert "S1" not in telemetry_service.SUPPORTED_STREAMS   # Postgres-backed, not Influx
     assert "S2" in telemetry_service.SUPPORTED_STREAMS
     assert "S9" not in telemetry_service.SUPPORTED_STREAMS

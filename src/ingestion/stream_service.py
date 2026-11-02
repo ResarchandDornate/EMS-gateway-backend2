@@ -1,9 +1,12 @@
-"""Generic VERBATIM persistence for northbound streams S2..S10 (structured JSONB path).
+"""Persistence for northbound streams S2..S10.
 
-Reuses the ingest_messages ledger (claim_or_resolve -> upsert -> mark_stored) exactly like
-the S1 fast_bess and S3 health paths. Records are stored verbatim. recorded_at is resolved
-best-effort from common record timestamp fields, falling back to the envelope
-created_at_utc, so a stream whose record uses a different time field is never rejected.
+Two paths, per the backend architecture:
+  * persist_stream_message  - S3..S10 structured/event data -> VERBATIM PostgreSQL JSONB
+    (stream_records). Reuses the ingest_messages ledger (claim -> upsert -> mark_stored).
+  * persist_influx_only     - S2 numeric telemetry -> InfluxDB ONLY. The ledger still
+    records the message (idempotency/ACK) in PostgreSQL, but no JSONB row is written.
+
+Records stored verbatim; recorded_at resolved best-effort from common timestamp fields.
 """
 import uuid
 
@@ -37,7 +40,7 @@ def _recorded_at(rec: dict, envelope: GenericStreamEnvelopeIn):
                 return parse_record_timestamp(v)
             except InvalidValue:
                 continue
-    return parse_record_timestamp(envelope.created_at_utc)   # envelope fallback
+    return parse_record_timestamp(envelope.created_at_utc)
 
 
 def _build_rows(gw_id, identity: dict, envelope: GenericStreamEnvelopeIn) -> list[dict]:
@@ -56,7 +59,7 @@ def _build_rows(gw_id, identity: dict, envelope: GenericStreamEnvelopeIn) -> lis
             record_index=i,
             source_id=_str_or_none(rec.get("source_id")),
             recorded_at=_recorded_at(rec, envelope),
-            payload=rec,                                   # verbatim
+            payload=rec,
         ))
     return rows
 
@@ -83,9 +86,7 @@ async def _upsert_rows(session, rows: list[dict]) -> None:
 
 async def persist_stream_message(session, *, gw, identity: dict,
                                  envelope: GenericStreamEnvelopeIn) -> IngestDecision:
-    """Full S2..S10 ingest decision+persist. Order: validate -> hash -> claim -> write
-    -> mark_stored. RESOLVED decisions return without writing; otherwise writes verbatim
-    JSONB and returns CLAIMED/RECLAIMED. Raises StoreNotConfirmed on a lost lease."""
+    """S3..S10 -> verbatim PostgreSQL JSONB. claim -> upsert -> mark_stored."""
     rows = _build_rows(gw.id, identity, envelope)
     payload_hash = canonical_hash(envelope.model_dump(mode="json"))
 
@@ -97,6 +98,30 @@ async def persist_stream_message(session, *, gw, identity: dict,
         return decision
 
     await _upsert_rows(session, rows)
+    stored = await mark_stored(session, gateway_id=gw.id,
+                               message_id=envelope.message_id, token=token)
+    if not stored:
+        raise StoreNotConfirmed("store not confirmed; retry")
+    return decision
+
+
+async def persist_influx_only(session, *, gw, identity: dict,
+                              envelope: GenericStreamEnvelopeIn,
+                              influx, influx_points) -> IngestDecision:
+    """S2 numeric telemetry -> InfluxDB ONLY. The ledger records the message for
+    idempotency/ACK (PostgreSQL), but NO JSONB row is written. claim -> write Influx ->
+    mark_stored. 'accepted' only after the Influx write succeeds."""
+    payload_hash = canonical_hash(envelope.model_dump(mode="json"))
+
+    decision, token = await claim_or_resolve(
+        session, gateway_id=gw.id, stream=envelope.stream, message_id=envelope.message_id,
+        sequence=envelope.sequence, record_count=envelope.record_count,
+        payload_hash=payload_hash)
+    if decision in _RESOLVED:
+        return decision
+
+    if influx is not None and influx_points:
+        await influx.write_built(influx_points)      # time-series to Influx (raises -> retry)
     stored = await mark_stored(session, gateway_id=gw.id,
                                message_id=envelope.message_id, token=token)
     if not stored:

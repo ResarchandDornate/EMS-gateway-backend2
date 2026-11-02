@@ -19,7 +19,6 @@ Production must serve the same entrypoint, `src.main:asgi_app`, without `--reloa
 working API but **bypasses `RequestContextMiddleware`**: no `X-Request-ID` response header,
 no per-request access log, and no correlated `unhandled_exception` log on 500s.
 
-This repository contains no production launch artifact (no Dockerfile, compose app service,
-Procfile, or CI/CD), so the deployment configuration is the only place this entrypoint is
+The launch artifacts in this repository are the `Dockerfile` CMD and the docker-compose `api` service; both must serve `src.main:asgi_app`. The deployment configuration is the only place this entrypoint is
 enforced. Documentation cannot confirm which target a deployment actually runs - confirm the
 deployed command points at `src.main:asgi_app`.
