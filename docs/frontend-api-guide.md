@@ -41,6 +41,7 @@ For `422` validation errors, `detail` is a list describing each bad field:
 | 404 | Not found | Show `detail` |
 | 409 | Duplicate (org key, phone, gateway key) or limit reached | Show `detail` |
 | 422 | Invalid input | Show field errors |
+| 429 | Too many requests (OTP rate limiting — currently switched off) | Show "try again in a minute" |
 | 503 | Backend dependency unavailable | Show "try again later" |
 
 ---
@@ -224,10 +225,10 @@ Request:
   ]
 }
 ```
-- `org_key` — short unique code, letters/numbers/dashes
+- `org_key` — short unique code; the backend trims and lowercases it (`" ACME "` → `"acme"`)
 - `admin_phone` — required and unique; this person becomes the client's Org Admin (OTP login)
 - `admin_email` — optional
-- `sites` — one or more sites; can be empty
+- `sites` — one or more sites; can be empty. `site_key` is also trimmed and lowercased
 
 Response `201`:
 ```json
@@ -240,7 +241,8 @@ Response `201`:
   "sites": [ { "id": "…site uuid…", "site_key": "acme-pune", "name": "Acme Pune Plant" } ]
 }
 ```
-Errors: `409 Organization key already exists` · `409 Phone number already registered`
+Errors: `409 Organization key already exists` · `409 Phone number already registered` ·
+`409 Duplicate site key in request`
 
 ### 4c. Generate client ID + client secret (register a gateway)
 
@@ -250,7 +252,7 @@ Request:
 ```json
 { "gateway_key": "ems-gw-2", "software_version": "1.0.0" }
 ```
-- `gateway_key` — unique name for this gateway device (required)
+- `gateway_key` — unique name for this gateway device (required; trimmed, case kept)
 - `software_version` — optional
 
 Response `201`:
@@ -261,7 +263,8 @@ Response `201`:
   "gateway_key": "ems-gw-2",
   "client_id": "gw_ef6ed9018b2c3479980586bf2a098d71",
   "client_secret": "FFUt…",
-  "enabled": true
+  "enabled": true,
+  "last_seen_at": null
 }
 ```
 Errors: `404 Site not found` · `403 Site access denied` · `409 Gateway key already exists`
@@ -291,10 +294,13 @@ every telemetry message, or the backend rejects it with `403`.
 Response `200`:
 ```json
 [
-  { "id": "…", "site_id": "…", "gateway_key": "ems-gw-1", "client_id": "gw_…", "enabled": true }
+  { "id": "…", "site_id": "…", "gateway_key": "ems-gw-1", "client_id": "gw_…", "enabled": true,
+    "last_seen_at": "2026-10-30T06:10:00Z" }
 ]
 ```
-No secrets are returned here.
+No secrets are returned here. `last_seen_at` is when the gateway last logged in successfully
+(`null` = never connected). Use it for a "connected / never connected" badge — it is not the
+time of the last telemetry.
 
 ---
 
@@ -311,6 +317,7 @@ Response `201`:
 { "id": "…", "phone": "+919812345678", "email": "op@acme.com", "is_active": true, "site_ids": ["…"] }
 ```
 Errors: `409 Maximum of 2 active operators reached` · `409 Phone number already registered` ·
+`409 Email already registered` ·
 `400 One or more sites do not belong to your organization` · `403 Only an organization admin can manage operators`
 
 **`GET /api/v1/org/operators`** → `200` list of the same objects.
@@ -401,7 +408,7 @@ Errors for 6a–6c: `422` (bad signal, time range or window) · `501 signal rete
 | Endpoint | Response |
 |---|---|
 | `GET /health` | `{ "status": "ok", "service": "ems-backend" }` |
-| `GET /ready` | `{ "status": "ok", "postgres": "ok", "redis": "ok" }` (`503` if a dependency is down) |
+| `GET /ready` | `{ "status": "ok", "postgres": "ok", "redis": "ok", "influx": "ok" }` (`503` if a dependency is down) |
 
 ---
 
