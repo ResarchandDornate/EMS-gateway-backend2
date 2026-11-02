@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import re
 from collections import defaultdict
+from contextlib import asynccontextmanager
 from dataclasses import dataclass
 from datetime import datetime, timezone
 
@@ -189,14 +190,34 @@ class InfluxGateway:
     overwrite only, NOT message-level idempotency (Phase 9, Postgres).
     """
 
-    def __init__(self, settings=None):
+    def __init__(self, settings=None, client: InfluxDBClientAsync | None = None):
         self._settings = settings or get_settings()
         self._url = self._settings.influx_url
         self._token = self._settings.influx_token
         self._org = self._settings.influx_org
+        self._timeout_ms = int(getattr(self._settings, "influx_timeout_ms", 20_000))
+        self._shared = client     # app-lifespan shared client (reused); None => per-call
 
     def _client(self) -> InfluxDBClientAsync:
-        return InfluxDBClientAsync(url=self._url, token=self._token, org=self._org)
+        # Explicit timeout: a hung write fails fast and well under the 60 s ingest lease,
+        # instead of stalling the request and leaving the ledger row pending indefinitely.
+        return InfluxDBClientAsync(url=self._url, token=self._token, org=self._org,
+                                   timeout=self._timeout_ms)
+
+    @asynccontextmanager
+    async def _acquire(self):
+        """Yield a client for one operation. Reuse the shared (app-lifespan) client when
+        present -- its connection pool avoids opening a fresh connection per message under
+        load -- and never close it here. With no shared client, create and close a per-call
+        client (backward-compatible with tests and non-app callers)."""
+        if self._shared is not None:
+            yield self._shared
+        else:
+            c = self._client()
+            try:
+                yield c
+            finally:
+                await c.close()
 
     @property
     def settings(self):
@@ -214,7 +235,7 @@ class InfluxGateway:
         for p in points:
             bucket, pt = build_point(index, p, self._settings)
             by_bucket[bucket].append(pt)
-        async with self._client() as c:
+        async with self._acquire() as c:
             wapi = c.write_api()
             for bucket, recs in by_bucket.items():
                 await wapi.write(bucket=bucket, record=recs)
@@ -231,7 +252,7 @@ class InfluxGateway:
             if bucket not in allowed:
                 raise UnsafeQueryInput(f"refusing write to non-configured bucket: {bucket!r}")
             by_bucket[bucket].append(pt)
-        async with self._client() as c:
+        async with self._acquire() as c:
             wapi = c.write_api()
             for bucket, recs in by_bucket.items():
                 await wapi.write(bucket=bucket, record=recs)
