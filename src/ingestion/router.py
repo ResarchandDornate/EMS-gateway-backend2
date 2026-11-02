@@ -17,7 +17,8 @@ from src.ingestion.schemas import EnvelopeIn, IngestAck
 from src.ingestion.s1_fast_bess import S1FastBessEnvelopeIn
 from src.ingestion.fast_bess_service import persist_fast_bess_message
 from src.ingestion.generic_stream import GenericStreamEnvelopeIn
-from src.ingestion.stream_service import persist_stream_message, persist_influx_only
+from src.ingestion.stream_service import (persist_stream_message, persist_influx_only,
+                                           persist_influx_batch)
 from src.ingestion.influx_projection import build_influx_points
 from src.ingestion.s3_health import S3HealthEnvelopeIn
 from src.ingestion.health_service import StoreNotConfirmed, persist_health_message
@@ -196,6 +197,7 @@ async def _ingest_batch(body, session, gw, influx) -> JSONResponse:
 
     accepted: list[dict] = []
     rejected: list[dict] = []
+    s2_items: list = []                    # (envelope, points) deferred for one bulk Influx write
 
     def _reject(message_id, error_code, detail, *, retryable=True):
         rejected.append({
@@ -237,11 +239,9 @@ async def _ingest_batch(body, session, gw, influx) -> JSONResponse:
             if code == "S1":                              # S1 -> PostgreSQL JSONB only
                 decision = await persist_fast_bess_message(
                     session, gw=gw, identity=identity, envelope=envelope)
-            elif code == "S2":                            # S2 -> InfluxDB only (ledger in PG)
-                points = build_influx_points(envelope, identity, influx.settings)
-                decision = await persist_influx_only(
-                    session, gw=gw, identity=identity, envelope=envelope,
-                    influx=influx, influx_points=points)
+            elif code == "S2":                            # S2 -> deferred; one bulk Influx write below
+                s2_items.append((envelope, build_influx_points(envelope, identity, influx.settings)))
+                continue
             elif code in _BATCH_DEDICATED:                # S3-S9 -> dedicated per-stream table
                 _persist = _BATCH_DEDICATED[code][1]
                 decision = await _persist(
@@ -271,6 +271,31 @@ async def _ingest_batch(body, session, gw, influx) -> JSONResponse:
                     "message is already being processed", retryable=True)
         else:  # CLAIMED / RECLAIMED -> stored this delivery
             accepted.append({"message_id": str(envelope.message_id), "status": "accepted"})
+
+    # S2 deferred path: claim all, write every point in ONE bulk Influx call, then mark each
+    # stored. Same ledger/ACK semantics as the per-message path; a bulk-write failure fails
+    # the whole batch's S2 messages retryable (gateway keeps them), nothing half-acked.
+    if s2_items:
+        try:
+            s2_results = await persist_influx_batch(
+                session, gw=gw, identity=identity, items=s2_items, influx=influx)
+        except Exception:
+            s2_results = {env.message_id: "write_failed" for env, _ in s2_items}
+        for envelope, _ in s2_items:
+            outcome = s2_results.get(envelope.message_id)
+            if outcome == "stored":
+                accepted.append({"message_id": str(envelope.message_id), "status": "accepted"})
+            elif outcome == IngestDecision.DUPLICATE_STORED:
+                accepted.append({"message_id": str(envelope.message_id), "status": "already_processed"})
+            elif outcome == IngestDecision.HASH_MISMATCH:
+                _reject(str(envelope.message_id), "message_id_reused",
+                        "message_id reused with a different payload", retryable=True)
+            elif outcome == IngestDecision.IN_PROGRESS:
+                _reject(str(envelope.message_id), "temporary_backend_unavailable",
+                        "message is already being processed", retryable=True)
+            else:  # write_failed / not_confirmed / missing -> keep on the gateway
+                _reject(str(envelope.message_id), "temporary_backend_unavailable",
+                        "store not confirmed; retry", retryable=True)
 
     return JSONResponse(status_code=status.HTTP_200_OK,
                         content={"accepted": accepted, "rejected": rejected})

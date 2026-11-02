@@ -1,0 +1,335 @@
+diff --git a/src/ingestion/router.py b/src/ingestion/router.py
+index a363bfc..9175196 100644
+--- a/src/ingestion/router.py
++++ b/src/ingestion/router.py
+@@ -17,7 +17,8 @@ from src.ingestion.schemas import EnvelopeIn, IngestAck
+ from src.ingestion.s1_fast_bess import S1FastBessEnvelopeIn
+ from src.ingestion.fast_bess_service import persist_fast_bess_message
+ from src.ingestion.generic_stream import GenericStreamEnvelopeIn
+-from src.ingestion.stream_service import persist_stream_message, persist_influx_only
++from src.ingestion.stream_service import (persist_stream_message, persist_influx_only,
++                                           persist_influx_batch)
+ from src.ingestion.influx_projection import build_influx_points
+ from src.ingestion.s3_health import S3HealthEnvelopeIn
+ from src.ingestion.health_service import StoreNotConfirmed, persist_health_message
+@@ -196,6 +197,7 @@ async def _ingest_batch(body, session, gw, influx) -> JSONResponse:
+ 
+     accepted: list[dict] = []
+     rejected: list[dict] = []
++    s2_items: list = []                    # (envelope, points) deferred for one bulk Influx write
+ 
+     def _reject(message_id, error_code, detail, *, retryable=True):
+         rejected.append({
+@@ -237,11 +239,9 @@ async def _ingest_batch(body, session, gw, influx) -> JSONResponse:
+             if code == "S1":                              # S1 -> PostgreSQL JSONB only
+                 decision = await persist_fast_bess_message(
+                     session, gw=gw, identity=identity, envelope=envelope)
+-            elif code == "S2":                            # S2 -> InfluxDB only (ledger in PG)
+-                points = build_influx_points(envelope, identity, influx.settings)
+-                decision = await persist_influx_only(
+-                    session, gw=gw, identity=identity, envelope=envelope,
+-                    influx=influx, influx_points=points)
++            elif code == "S2":                            # S2 -> deferred; one bulk Influx write below
++                s2_items.append((envelope, build_influx_points(envelope, identity, influx.settings)))
++                continue
+             elif code in _BATCH_DEDICATED:                # S3-S9 -> dedicated per-stream table
+                 _persist = _BATCH_DEDICATED[code][1]
+                 decision = await _persist(
+@@ -272,6 +272,31 @@ async def _ingest_batch(body, session, gw, influx) -> JSONResponse:
+         else:  # CLAIMED / RECLAIMED -> stored this delivery
+             accepted.append({"message_id": str(envelope.message_id), "status": "accepted"})
+ 
++    # S2 deferred path: claim all, write every point in ONE bulk Influx call, then mark each
++    # stored. Same ledger/ACK semantics as the per-message path; a bulk-write failure fails
++    # the whole batch's S2 messages retryable (gateway keeps them), nothing half-acked.
++    if s2_items:
++        try:
++            s2_results = await persist_influx_batch(
++                session, gw=gw, identity=identity, items=s2_items, influx=influx)
++        except Exception:
++            s2_results = {env.message_id: "write_failed" for env, _ in s2_items}
++        for envelope, _ in s2_items:
++            outcome = s2_results.get(envelope.message_id)
++            if outcome == "stored":
++                accepted.append({"message_id": str(envelope.message_id), "status": "accepted"})
++            elif outcome == IngestDecision.DUPLICATE_STORED:
++                accepted.append({"message_id": str(envelope.message_id), "status": "already_processed"})
++            elif outcome == IngestDecision.HASH_MISMATCH:
++                _reject(str(envelope.message_id), "message_id_reused",
++                        "message_id reused with a different payload", retryable=True)
++            elif outcome == IngestDecision.IN_PROGRESS:
++                _reject(str(envelope.message_id), "temporary_backend_unavailable",
++                        "message is already being processed", retryable=True)
++            else:  # write_failed / not_confirmed / missing -> keep on the gateway
++                _reject(str(envelope.message_id), "temporary_backend_unavailable",
++                        "store not confirmed; retry", retryable=True)
++
+     return JSONResponse(status_code=status.HTTP_200_OK,
+                         content={"accepted": accepted, "rejected": rejected})
+ 
+diff --git a/src/ingestion/stream_service.py b/src/ingestion/stream_service.py
+index 4b7d6d2..eee9b5f 100644
+--- a/src/ingestion/stream_service.py
++++ b/src/ingestion/stream_service.py
+@@ -84,9 +84,11 @@ def _classify_write_error(exc: BaseException) -> str:
+     return "permanent"                            # UNKNOWN -> fail fast (surface the defect)
+ 
+ 
+-async def _write_s2_with_retry(influx, points, *, envelope, gw) -> None:
+-    """Write S2 points to InfluxDB under a genuine TOTAL wall-clock deadline, retrying only
+-    TRANSIENT failures (classified via _classify_write_error).
++async def _write_with_retry(influx, points, *, log_fields: dict) -> None:
++    """Write Influx points under a genuine TOTAL wall-clock deadline, retrying only TRANSIENT
++    failures (classified via _classify_write_error). Shared by the per-message and the batch
++    S2 paths; `log_fields` carries whichever identifiers the caller has (one message, or a
++    whole batch).
+ 
+     Budget semantics: `influx_retry_budget_ms` is the TOTAL operation budget INCLUDING the
+     first attempt. Each attempt runs under asyncio.wait_for(min(influx_timeout_ms, remaining)),
+@@ -96,11 +98,8 @@ async def _write_s2_with_retry(influx, points, *, envelope, gw) -> None:
+     by a config validator and intended <= the gateway HTTP timeout.
+ 
+     On a permanent error, exhausted retries, or the deadline, it re-raises -> the caller
+-    returns a retryable reject and the ledger row stays 'pending' (never acked without a
+-    confirmed write). External CancelledError propagates immediately, never retried.
+-
+-    Forward-only: operates solely on the in-flight request while `points` is held in memory;
+-    it never scans or mutates ledger rows, so historical/pending rows are untouched. Retries
++    returns a retryable reject and the ledger row(s) stay 'pending' (never acked without a
++    confirmed write). External CancelledError propagates immediately, never retried. Retries
+     re-send the same deterministic points (idempotent, last-write-wins -- no duplicate)."""
+     s = getattr(influx, "settings", None)
+     retries = int(getattr(s, "influx_write_retries", 0) or 0)
+@@ -111,19 +110,16 @@ async def _write_s2_with_retry(influx, points, *, envelope, gw) -> None:
+     while True:
+         remaining = None if deadline is None else (deadline - time.monotonic())
+         if remaining is not None and remaining <= 0:
+-            _log.warning("s2_influx_write_deadline_exhausted",
+-                         message_id=str(envelope.message_id), gateway_id=str(gw.id),
+-                         stream=envelope.stream, attempt=attempt + 1, retryable=True)
++            _log.warning("s2_influx_write_deadline_exhausted", attempt=attempt + 1,
++                         retryable=True, **log_fields)
+             raise TimeoutError("s2 influx write exceeded total retry budget")
+         cap = per_attempt_s if remaining is None else min(per_attempt_s, remaining)
+         t0 = time.monotonic()
+         try:
+             await asyncio.wait_for(influx.write_built(points), timeout=cap)
+             if attempt:
+-                _log.info("s2_influx_write_recovered",
+-                          message_id=str(envelope.message_id), gateway_id=str(gw.id),
+-                          stream=envelope.stream, attempts=attempt + 1,
+-                          duration_ms=round((time.monotonic() - t0) * 1000, 2))
++                _log.info("s2_influx_write_recovered", attempts=attempt + 1,
++                          duration_ms=round((time.monotonic() - t0) * 1000, 2), **log_fields)
+             return
+         except asyncio.CancelledError:
+             raise                                 # external cancellation: never retry/swallow
+@@ -133,13 +129,11 @@ async def _write_s2_with_retry(influx, points, *, envelope, gw) -> None:
+             will_retry = (klass == "transient" and attempt < retries and not over_deadline)
+             # Never swallow: every failure is surfaced; on exhaustion/permanent we re-raise so
+             # the caller returns a retryable reject (the row stays 'pending').
+-            _log.warning("s2_influx_write_failed",
+-                         message_id=str(envelope.message_id), gateway_id=str(gw.id),
+-                         stream=envelope.stream, points=len(points),
++            _log.warning("s2_influx_write_failed", points=len(points),
+                          error_category=type(exc).__name__, error_class=klass,
+                          http_status=_http_status(exc), attempt=attempt + 1,
+                          duration_ms=round((time.monotonic() - t0) * 1000, 2),
+-                         will_retry=will_retry, retryable=True)
++                         will_retry=will_retry, retryable=True, **log_fields)
+             if not will_retry:
+                 raise
+             attempt += 1
+@@ -153,6 +147,13 @@ async def _write_s2_with_retry(influx, points, *, envelope, gw) -> None:
+                     raise
+             await asyncio.sleep(backoff)
+ 
++
++async def _write_s2_with_retry(influx, points, *, envelope, gw) -> None:
++    """Single-message S2 write (per-message path). Thin wrapper over _write_with_retry."""
++    await _write_with_retry(influx, points, log_fields={
++        "message_id": str(envelope.message_id), "gateway_id": str(gw.id),
++        "stream": envelope.stream})
++
+ _TS_FIELDS = ("timestamp_utc", "source_updated_utc", "observed_at_utc",
+               "recorded_at", "event_time_utc", "sample_time_utc")
+ 
+@@ -264,3 +265,58 @@ async def persist_influx_only(session, *, gw, identity: dict,
+     _log.debug("s2_stored", message_id=str(envelope.message_id),
+                gateway_id=str(gw.id), decision=decision.value)
+     return decision
++
++
++async def persist_influx_batch(session, *, gw, identity: dict, items, influx) -> dict:
++    """Batch S2 persistence: claim every message (ledger), write ALL of the batch's points in
++    a SINGLE Influx write, then confirm each stored. One bulk write replaces N per-message
++    writes, so a large batch returns fast and does not outrun the gateway's HTTP timeout.
++
++    `items` is a list of (envelope, points). Returns {message_id: outcome} where outcome is an
++    IngestDecision for resolved messages (DUPLICATE_STORED / HASH_MISMATCH / IN_PROGRESS -> no
++    write) or one of the strings 'stored' / 'not_confirmed' / 'write_failed' for claimed
++    messages; the caller maps these to the accepted[]/rejected[] ACK contract.
++
++    Semantics preserved from the per-message path: at-least-once with idempotent points. A
++    failed bulk write leaves every claimed row 'pending' (retryable) -- a gateway retry
++    reclaims and re-sends identical deterministic points (last-write-wins, no duplication).
++    Resolved duplicates are NOT re-written. 'accepted' is only reported after mark_stored
++    confirms. Forward-only: never scans or mutates historical/pending rows."""
++    results: dict = {}
++    claimed: list = []          # (envelope, token) that need write + confirm
++    combined_points: list = []
++    for envelope, points in items:
++        payload_hash = canonical_hash(envelope.model_dump(mode="json"))
++        decision, token = await claim_or_resolve(
++            session, gateway_id=gw.id, stream=envelope.stream, message_id=envelope.message_id,
++            sequence=envelope.sequence, record_count=envelope.record_count,
++            payload_hash=payload_hash)
++        if decision in _RESOLVED:
++            results[envelope.message_id] = decision      # duplicate / hash mismatch / in-progress
++            continue
++        claimed.append((envelope, token))
++        if points:
++            combined_points.extend(points)
++
++    if not claimed:
++        return results
++
++    if combined_points:
++        try:
++            await _write_with_retry(influx, combined_points, log_fields={
++                "gateway_id": str(gw.id), "stream": "S2", "batch_messages": len(claimed)})
++        except Exception:
++            # Already logged inside _write_with_retry. The whole bulk write failed, so EVERY
++            # claimed row stays 'pending' (retryable) -- never confirm any as stored.
++            for envelope, _ in claimed:
++                results[envelope.message_id] = "write_failed"
++            return results
++
++    for envelope, token in claimed:
++        stored = await mark_stored(session, gateway_id=gw.id,
++                                   message_id=envelope.message_id, token=token)
++        if not stored:
++            _log.warning("s2_store_not_confirmed", message_id=str(envelope.message_id),
++                         gateway_id=str(gw.id), stream="S2", retryable=True)
++        results[envelope.message_id] = "stored" if stored else "not_confirmed"
++    return results
+diff --git a/tests/unit/test_s2_ingestion_reliability.py b/tests/unit/test_s2_ingestion_reliability.py
+index 182b649..c4c5b12 100644
+--- a/tests/unit/test_s2_ingestion_reliability.py
++++ b/tests/unit/test_s2_ingestion_reliability.py
+@@ -214,17 +214,18 @@ async def test_batch_mixed_accepted_rejected(monkeypatch):
+             self.record_count = 1
+             self.records = []
+ 
+-    async def fake_persist(session, *, gw, identity, envelope, influx, influx_points):
+-        if envelope.message_id == "bad":
+-            raise Exception("influx down")
+-        return IngestDecision.CLAIMED
++    # S2 now routes through the deferred bulk path: one persist_influx_batch call for the
++    # whole batch, returning {message_id: outcome}. 'bad' comes back write_failed (retryable).
++    async def fake_batch(session, *, gw, identity, items, influx):
++        return {env.message_id: ("write_failed" if env.message_id == "bad" else "stored")
++                for env, _ in items}
+ 
+     monkeypatch.setattr(r, "resolve_gateway_identity", fake_identity)
+     monkeypatch.setattr(r, "adapt_batch_message", fake_adapt)
+     monkeypatch.setattr(r, "GenericStreamEnvelopeIn", FakeEnv)
+     monkeypatch.setattr(r, "verify_scope", lambda *a, **k: True)
+     monkeypatch.setattr(r, "build_influx_points", lambda *a, **k: _POINTS)
+-    monkeypatch.setattr(r, "persist_influx_only", fake_persist)
++    monkeypatch.setattr(r, "persist_influx_batch", fake_batch)
+ 
+     body = {"request_id": "rq", "gateway_id": "g", "sent_at_utc": "2026-11-02T06:00:00Z",
+             "messages": [{"message_id": "good"}, {"message_id": "bad"}]}
+@@ -236,6 +237,91 @@ async def test_batch_mixed_accepted_rejected(monkeypatch):
+     assert all(x["retryable"] for x in data["rejected"])     # failures stay retryable
+ 
+ 
++# ----------------------- 8b. persist_influx_batch: ONE bulk write, same ledger/ACK semantics
++
++
++async def test_batch_one_bulk_write_for_many_messages(monkeypatch):
++    """N claimed S2 messages -> exactly ONE Influx write (combined points), each marked stored."""
++    mark_calls = []
++    _patch_ledger(monkeypatch, decision=IngestDecision.CLAIMED, stored=True,
++                  mark_calls=mark_calls)
++    infl = _Influx("ok")
++    items = [(_Env(), _POINTS), (_Env(), _POINTS), (_Env(), _POINTS)]
++    results = await ss.persist_influx_batch(None, gw=_Gw(), identity={}, items=items, influx=infl)
++    assert infl.writes == 1                               # single bulk write, not one-per-message
++    assert len(mark_calls) == 3                           # every claimed message confirmed
++    assert all(results[env.message_id] == "stored" for env, _ in items)
++
++
++async def test_batch_duplicates_skipped_and_not_rewritten(monkeypatch):
++    """Resolved duplicates are acked with their decision, never re-written or marked again."""
++    mark_calls = []
++    _patch_ledger(monkeypatch, decision=IngestDecision.DUPLICATE_STORED, mark_calls=mark_calls)
++    infl = _Influx("ok")
++    items = [(_Env(), _POINTS), (_Env(), _POINTS)]
++    results = await ss.persist_influx_batch(None, gw=_Gw(), identity={}, items=items, influx=infl)
++    assert infl.writes == 0                               # nothing claimed -> no write at all
++    assert mark_calls == []                               # resolved rows are never re-marked
++    assert all(results[env.message_id] == IngestDecision.DUPLICATE_STORED for env, _ in items)
++
++
++async def test_batch_mixed_duplicate_and_claimed(monkeypatch):
++    """A duplicate alongside fresh messages: only the fresh points are written and marked."""
++    mark_calls = []
++    dup = _Env(); fresh1 = _Env(); fresh2 = _Env()
++    tokens = {}
++
++    async def fake_claim(session, *, message_id, **kw):
++        if message_id == dup.message_id:
++            return IngestDecision.DUPLICATE_STORED, None
++        tok = uuid.uuid4(); tokens[message_id] = tok
++        return IngestDecision.CLAIMED, tok
++
++    async def fake_mark(session, **kw):
++        mark_calls.append(kw["message_id"]); return True
++
++    monkeypatch.setattr(ss, "claim_or_resolve", fake_claim)
++    monkeypatch.setattr(ss, "mark_stored", fake_mark)
++    infl = _Influx("ok")
++    items = [(dup, _POINTS), (fresh1, _POINTS), (fresh2, _POINTS)]
++    results = await ss.persist_influx_batch(None, gw=_Gw(), identity={}, items=items, influx=infl)
++    assert infl.writes == 1                               # one write for the two fresh messages
++    assert set(mark_calls) == {fresh1.message_id, fresh2.message_id}   # dup not marked
++    assert results[dup.message_id] == IngestDecision.DUPLICATE_STORED
++    assert results[fresh1.message_id] == "stored" and results[fresh2.message_id] == "stored"
++
++
++async def test_batch_bulk_write_failure_marks_none(monkeypatch):
++    """A failed bulk write fails EVERY claimed message write_failed; mark_stored never called
++    (rows stay 'pending' -> retryable -> gateway resends; no half-acked batch)."""
++    mark_calls = []
++    _patch_ledger(monkeypatch, decision=IngestDecision.CLAIMED, stored=True,
++                  mark_calls=mark_calls)
++    infl = _Influx("conn")
++    items = [(_Env(), _POINTS), (_Env(), _POINTS)]
++    results = await ss.persist_influx_batch(None, gw=_Gw(), identity={}, items=items, influx=infl)
++    assert mark_calls == []                               # never confirm stored on write failure
++    assert all(results[env.message_id] == "write_failed" for env, _ in items)
++
++
++async def test_batch_mark_not_confirmed(monkeypatch):
++    """Write succeeds but the lease CAS fails -> not_confirmed (never acked as stored)."""
++    _patch_ledger(monkeypatch, decision=IngestDecision.CLAIMED, stored=False)
++    infl = _Influx("ok")
++    items = [(_Env(), _POINTS)]
++    results = await ss.persist_influx_batch(None, gw=_Gw(), identity={}, items=items, influx=infl)
++    assert infl.writes == 1
++    assert all(results[env.message_id] == "not_confirmed" for env, _ in items)
++
++
++async def test_batch_empty_items_no_write(monkeypatch):
++    """Empty batch -> no claim, no write, empty result."""
++    _patch_ledger(monkeypatch, decision=IngestDecision.CLAIMED, stored=True)
++    infl = _Influx("ok")
++    results = await ss.persist_influx_batch(None, gw=_Gw(), identity={}, items=[], influx=infl)
++    assert results == {} and infl.writes == 0
++
++
+ # ------------------------------------------------ 9. S1 and S3-S10 routing unchanged
+ 
+ 
