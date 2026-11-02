@@ -214,17 +214,18 @@ async def test_batch_mixed_accepted_rejected(monkeypatch):
             self.record_count = 1
             self.records = []
 
-    async def fake_persist(session, *, gw, identity, envelope, influx, influx_points):
-        if envelope.message_id == "bad":
-            raise Exception("influx down")
-        return IngestDecision.CLAIMED
+    # S2 now routes through the deferred bulk path: one persist_influx_batch call for the
+    # whole batch, returning {message_id: outcome}. 'bad' comes back write_failed (retryable).
+    async def fake_batch(session, *, gw, identity, items, influx):
+        return {env.message_id: ("write_failed" if env.message_id == "bad" else "stored")
+                for env, _ in items}
 
     monkeypatch.setattr(r, "resolve_gateway_identity", fake_identity)
     monkeypatch.setattr(r, "adapt_batch_message", fake_adapt)
     monkeypatch.setattr(r, "GenericStreamEnvelopeIn", FakeEnv)
     monkeypatch.setattr(r, "verify_scope", lambda *a, **k: True)
     monkeypatch.setattr(r, "build_influx_points", lambda *a, **k: _POINTS)
-    monkeypatch.setattr(r, "persist_influx_only", fake_persist)
+    monkeypatch.setattr(r, "persist_influx_batch", fake_batch)
 
     body = {"request_id": "rq", "gateway_id": "g", "sent_at_utc": "2026-11-02T06:00:00Z",
             "messages": [{"message_id": "good"}, {"message_id": "bad"}]}
@@ -234,6 +235,91 @@ async def test_batch_mixed_accepted_rejected(monkeypatch):
     assert {a["message_id"] for a in data["accepted"]} == {"good"}
     assert {x["message_id"] for x in data["rejected"]} == {"bad"}
     assert all(x["retryable"] for x in data["rejected"])     # failures stay retryable
+
+
+# ----------------------- 8b. persist_influx_batch: ONE bulk write, same ledger/ACK semantics
+
+
+async def test_batch_one_bulk_write_for_many_messages(monkeypatch):
+    """N claimed S2 messages -> exactly ONE Influx write (combined points), each marked stored."""
+    mark_calls = []
+    _patch_ledger(monkeypatch, decision=IngestDecision.CLAIMED, stored=True,
+                  mark_calls=mark_calls)
+    infl = _Influx("ok")
+    items = [(_Env(), _POINTS), (_Env(), _POINTS), (_Env(), _POINTS)]
+    results = await ss.persist_influx_batch(None, gw=_Gw(), identity={}, items=items, influx=infl)
+    assert infl.writes == 1                               # single bulk write, not one-per-message
+    assert len(mark_calls) == 3                           # every claimed message confirmed
+    assert all(results[env.message_id] == "stored" for env, _ in items)
+
+
+async def test_batch_duplicates_skipped_and_not_rewritten(monkeypatch):
+    """Resolved duplicates are acked with their decision, never re-written or marked again."""
+    mark_calls = []
+    _patch_ledger(monkeypatch, decision=IngestDecision.DUPLICATE_STORED, mark_calls=mark_calls)
+    infl = _Influx("ok")
+    items = [(_Env(), _POINTS), (_Env(), _POINTS)]
+    results = await ss.persist_influx_batch(None, gw=_Gw(), identity={}, items=items, influx=infl)
+    assert infl.writes == 0                               # nothing claimed -> no write at all
+    assert mark_calls == []                               # resolved rows are never re-marked
+    assert all(results[env.message_id] == IngestDecision.DUPLICATE_STORED for env, _ in items)
+
+
+async def test_batch_mixed_duplicate_and_claimed(monkeypatch):
+    """A duplicate alongside fresh messages: only the fresh points are written and marked."""
+    mark_calls = []
+    dup = _Env(); fresh1 = _Env(); fresh2 = _Env()
+    tokens = {}
+
+    async def fake_claim(session, *, message_id, **kw):
+        if message_id == dup.message_id:
+            return IngestDecision.DUPLICATE_STORED, None
+        tok = uuid.uuid4(); tokens[message_id] = tok
+        return IngestDecision.CLAIMED, tok
+
+    async def fake_mark(session, **kw):
+        mark_calls.append(kw["message_id"]); return True
+
+    monkeypatch.setattr(ss, "claim_or_resolve", fake_claim)
+    monkeypatch.setattr(ss, "mark_stored", fake_mark)
+    infl = _Influx("ok")
+    items = [(dup, _POINTS), (fresh1, _POINTS), (fresh2, _POINTS)]
+    results = await ss.persist_influx_batch(None, gw=_Gw(), identity={}, items=items, influx=infl)
+    assert infl.writes == 1                               # one write for the two fresh messages
+    assert set(mark_calls) == {fresh1.message_id, fresh2.message_id}   # dup not marked
+    assert results[dup.message_id] == IngestDecision.DUPLICATE_STORED
+    assert results[fresh1.message_id] == "stored" and results[fresh2.message_id] == "stored"
+
+
+async def test_batch_bulk_write_failure_marks_none(monkeypatch):
+    """A failed bulk write fails EVERY claimed message write_failed; mark_stored never called
+    (rows stay 'pending' -> retryable -> gateway resends; no half-acked batch)."""
+    mark_calls = []
+    _patch_ledger(monkeypatch, decision=IngestDecision.CLAIMED, stored=True,
+                  mark_calls=mark_calls)
+    infl = _Influx("conn")
+    items = [(_Env(), _POINTS), (_Env(), _POINTS)]
+    results = await ss.persist_influx_batch(None, gw=_Gw(), identity={}, items=items, influx=infl)
+    assert mark_calls == []                               # never confirm stored on write failure
+    assert all(results[env.message_id] == "write_failed" for env, _ in items)
+
+
+async def test_batch_mark_not_confirmed(monkeypatch):
+    """Write succeeds but the lease CAS fails -> not_confirmed (never acked as stored)."""
+    _patch_ledger(monkeypatch, decision=IngestDecision.CLAIMED, stored=False)
+    infl = _Influx("ok")
+    items = [(_Env(), _POINTS)]
+    results = await ss.persist_influx_batch(None, gw=_Gw(), identity={}, items=items, influx=infl)
+    assert infl.writes == 1
+    assert all(results[env.message_id] == "not_confirmed" for env, _ in items)
+
+
+async def test_batch_empty_items_no_write(monkeypatch):
+    """Empty batch -> no claim, no write, empty result."""
+    _patch_ledger(monkeypatch, decision=IngestDecision.CLAIMED, stored=True)
+    infl = _Influx("ok")
+    results = await ss.persist_influx_batch(None, gw=_Gw(), identity={}, items=[], influx=infl)
+    assert results == {} and infl.writes == 0
 
 
 # ------------------------------------------------ 9. S1 and S3-S10 routing unchanged

@@ -84,9 +84,11 @@ def _classify_write_error(exc: BaseException) -> str:
     return "permanent"                            # UNKNOWN -> fail fast (surface the defect)
 
 
-async def _write_s2_with_retry(influx, points, *, envelope, gw) -> None:
-    """Write S2 points to InfluxDB under a genuine TOTAL wall-clock deadline, retrying only
-    TRANSIENT failures (classified via _classify_write_error).
+async def _write_with_retry(influx, points, *, log_fields: dict) -> None:
+    """Write Influx points under a genuine TOTAL wall-clock deadline, retrying only TRANSIENT
+    failures (classified via _classify_write_error). Shared by the per-message and the batch
+    S2 paths; `log_fields` carries whichever identifiers the caller has (one message, or a
+    whole batch).
 
     Budget semantics: `influx_retry_budget_ms` is the TOTAL operation budget INCLUDING the
     first attempt. Each attempt runs under asyncio.wait_for(min(influx_timeout_ms, remaining)),
@@ -96,11 +98,8 @@ async def _write_s2_with_retry(influx, points, *, envelope, gw) -> None:
     by a config validator and intended <= the gateway HTTP timeout.
 
     On a permanent error, exhausted retries, or the deadline, it re-raises -> the caller
-    returns a retryable reject and the ledger row stays 'pending' (never acked without a
-    confirmed write). External CancelledError propagates immediately, never retried.
-
-    Forward-only: operates solely on the in-flight request while `points` is held in memory;
-    it never scans or mutates ledger rows, so historical/pending rows are untouched. Retries
+    returns a retryable reject and the ledger row(s) stay 'pending' (never acked without a
+    confirmed write). External CancelledError propagates immediately, never retried. Retries
     re-send the same deterministic points (idempotent, last-write-wins -- no duplicate)."""
     s = getattr(influx, "settings", None)
     retries = int(getattr(s, "influx_write_retries", 0) or 0)
@@ -111,19 +110,16 @@ async def _write_s2_with_retry(influx, points, *, envelope, gw) -> None:
     while True:
         remaining = None if deadline is None else (deadline - time.monotonic())
         if remaining is not None and remaining <= 0:
-            _log.warning("s2_influx_write_deadline_exhausted",
-                         message_id=str(envelope.message_id), gateway_id=str(gw.id),
-                         stream=envelope.stream, attempt=attempt + 1, retryable=True)
+            _log.warning("s2_influx_write_deadline_exhausted", attempt=attempt + 1,
+                         retryable=True, **log_fields)
             raise TimeoutError("s2 influx write exceeded total retry budget")
         cap = per_attempt_s if remaining is None else min(per_attempt_s, remaining)
         t0 = time.monotonic()
         try:
             await asyncio.wait_for(influx.write_built(points), timeout=cap)
             if attempt:
-                _log.info("s2_influx_write_recovered",
-                          message_id=str(envelope.message_id), gateway_id=str(gw.id),
-                          stream=envelope.stream, attempts=attempt + 1,
-                          duration_ms=round((time.monotonic() - t0) * 1000, 2))
+                _log.info("s2_influx_write_recovered", attempts=attempt + 1,
+                          duration_ms=round((time.monotonic() - t0) * 1000, 2), **log_fields)
             return
         except asyncio.CancelledError:
             raise                                 # external cancellation: never retry/swallow
@@ -133,13 +129,11 @@ async def _write_s2_with_retry(influx, points, *, envelope, gw) -> None:
             will_retry = (klass == "transient" and attempt < retries and not over_deadline)
             # Never swallow: every failure is surfaced; on exhaustion/permanent we re-raise so
             # the caller returns a retryable reject (the row stays 'pending').
-            _log.warning("s2_influx_write_failed",
-                         message_id=str(envelope.message_id), gateway_id=str(gw.id),
-                         stream=envelope.stream, points=len(points),
+            _log.warning("s2_influx_write_failed", points=len(points),
                          error_category=type(exc).__name__, error_class=klass,
                          http_status=_http_status(exc), attempt=attempt + 1,
                          duration_ms=round((time.monotonic() - t0) * 1000, 2),
-                         will_retry=will_retry, retryable=True)
+                         will_retry=will_retry, retryable=True, **log_fields)
             if not will_retry:
                 raise
             attempt += 1
@@ -152,6 +146,13 @@ async def _write_s2_with_retry(influx, points, *, envelope, gw) -> None:
                 if backoff <= 0:
                     raise
             await asyncio.sleep(backoff)
+
+
+async def _write_s2_with_retry(influx, points, *, envelope, gw) -> None:
+    """Single-message S2 write (per-message path). Thin wrapper over _write_with_retry."""
+    await _write_with_retry(influx, points, log_fields={
+        "message_id": str(envelope.message_id), "gateway_id": str(gw.id),
+        "stream": envelope.stream})
 
 _TS_FIELDS = ("timestamp_utc", "source_updated_utc", "observed_at_utc",
               "recorded_at", "event_time_utc", "sample_time_utc")
@@ -264,3 +265,58 @@ async def persist_influx_only(session, *, gw, identity: dict,
     _log.debug("s2_stored", message_id=str(envelope.message_id),
                gateway_id=str(gw.id), decision=decision.value)
     return decision
+
+
+async def persist_influx_batch(session, *, gw, identity: dict, items, influx) -> dict:
+    """Batch S2 persistence: claim every message (ledger), write ALL of the batch's points in
+    a SINGLE Influx write, then confirm each stored. One bulk write replaces N per-message
+    writes, so a large batch returns fast and does not outrun the gateway's HTTP timeout.
+
+    `items` is a list of (envelope, points). Returns {message_id: outcome} where outcome is an
+    IngestDecision for resolved messages (DUPLICATE_STORED / HASH_MISMATCH / IN_PROGRESS -> no
+    write) or one of the strings 'stored' / 'not_confirmed' / 'write_failed' for claimed
+    messages; the caller maps these to the accepted[]/rejected[] ACK contract.
+
+    Semantics preserved from the per-message path: at-least-once with idempotent points. A
+    failed bulk write leaves every claimed row 'pending' (retryable) -- a gateway retry
+    reclaims and re-sends identical deterministic points (last-write-wins, no duplication).
+    Resolved duplicates are NOT re-written. 'accepted' is only reported after mark_stored
+    confirms. Forward-only: never scans or mutates historical/pending rows."""
+    results: dict = {}
+    claimed: list = []          # (envelope, token) that need write + confirm
+    combined_points: list = []
+    for envelope, points in items:
+        payload_hash = canonical_hash(envelope.model_dump(mode="json"))
+        decision, token = await claim_or_resolve(
+            session, gateway_id=gw.id, stream=envelope.stream, message_id=envelope.message_id,
+            sequence=envelope.sequence, record_count=envelope.record_count,
+            payload_hash=payload_hash)
+        if decision in _RESOLVED:
+            results[envelope.message_id] = decision      # duplicate / hash mismatch / in-progress
+            continue
+        claimed.append((envelope, token))
+        if points:
+            combined_points.extend(points)
+
+    if not claimed:
+        return results
+
+    if combined_points:
+        try:
+            await _write_with_retry(influx, combined_points, log_fields={
+                "gateway_id": str(gw.id), "stream": "S2", "batch_messages": len(claimed)})
+        except Exception:
+            # Already logged inside _write_with_retry. The whole bulk write failed, so EVERY
+            # claimed row stays 'pending' (retryable) -- never confirm any as stored.
+            for envelope, _ in claimed:
+                results[envelope.message_id] = "write_failed"
+            return results
+
+    for envelope, token in claimed:
+        stored = await mark_stored(session, gateway_id=gw.id,
+                                   message_id=envelope.message_id, token=token)
+        if not stored:
+            _log.warning("s2_store_not_confirmed", message_id=str(envelope.message_id),
+                         gateway_id=str(gw.id), stream="S2", retryable=True)
+        results[envelope.message_id] = "stored" if stored else "not_confirmed"
+    return results
