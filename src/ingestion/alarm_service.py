@@ -85,7 +85,7 @@ async def persist_alarm_events(session, *, gw, identity: dict,
     decision, token = await claim_or_resolve(
         session, gateway_id=gw.id, stream="S4", message_id=envelope.message_id,
         sequence=envelope.sequence, record_count=envelope.record_count,
-        payload_hash=payload_hash)
+        payload_hash=payload_hash, substream=getattr(envelope, "substream", None))
     if decision in _RESOLVED:
         return decision
 

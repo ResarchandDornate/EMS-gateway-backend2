@@ -85,7 +85,7 @@ def canonical_hash(envelope: dict) -> str:
 
 async def claim_or_resolve(session, *, gateway_id, stream, message_id,
                            sequence, record_count, payload_hash,
-                           lease_ttl_seconds=LEASE_TTL_SECONDS):
+                           substream=None, lease_ttl_seconds=LEASE_TTL_SECONDS):
     """Ledger state machine. Returns (IngestDecision, lease_token | None).
 
     9b-i scope: performs only the claim/lease decision. It NEVER marks 'stored'
@@ -109,8 +109,8 @@ async def claim_or_resolve(session, *, gateway_id, stream, message_id,
         claim = (
             pg_insert(IngestMessageModel)
             .values(id=uuid.uuid4(), gateway_id=gateway_id, message_id=message_id,
-                    stream=stream, sequence=sequence, record_count=record_count,
-                    payload_hash=payload_hash, status="pending",
+                    stream=stream, substream=substream, sequence=sequence,
+                    record_count=record_count, payload_hash=payload_hash, status="pending",
                     lease_owner=token, lease_expires_at=expires)
             .on_conflict_do_nothing(index_elements=["gateway_id", "message_id"])
             .returning(IngestMessageModel.id)

@@ -25,6 +25,7 @@ class IngestMessageModel(BaseEntityModel):
     )
     message_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True))
     stream: Mapped[str] = mapped_column(String(8))
+    substream: Mapped[str | None] = mapped_column(String(32))     # S2 substream etc.; null on legacy rows
     sequence: Mapped[int] = mapped_column(BigInteger)
     record_count: Mapped[int] = mapped_column(Integer)
     payload_hash: Mapped[str] = mapped_column(String(64))         # sha256 hex of canonical form

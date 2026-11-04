@@ -82,7 +82,7 @@ async def _process_numeric_envelope(envelope, *, session, gw, identity, index, i
     try:
         decision, token = await claim_or_resolve(
             session, gateway_id=gw.id, stream=envelope.stream, message_id=envelope.message_id,
-            sequence=envelope.sequence, record_count=envelope.record_count, payload_hash=payload_hash)
+            sequence=envelope.sequence, record_count=envelope.record_count, payload_hash=payload_hash, substream=getattr(envelope, "substream", None))
     except Exception:
         raise _NumericError(status.HTTP_503_SERVICE_UNAVAILABLE, "ingestion temporarily unavailable")
 

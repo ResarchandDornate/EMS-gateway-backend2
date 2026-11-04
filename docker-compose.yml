@@ -63,6 +63,7 @@ services:
       DATABASE_URL: postgresql+asyncpg://ems:ems_dev_password@postgres:5432/ems
       INFLUX_URL: http://influxdb:8086
       REDIS_URL: redis://redis:6379/0
+      CORS_ALLOWED_ORIGINS: https://ems-dashboard.unityess.cloud
     ports: ["8040:8000"]
     depends_on:
       postgres: { condition: service_healthy }
