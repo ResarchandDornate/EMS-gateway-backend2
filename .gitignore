@@ -7,3 +7,12 @@ __pycache__/
 .mypy_cache/
 *.egg-info/
 .env.staging
+
+# applied patch artifacts (do not commit)
+*.patch
+
+.env
+.env.*
+!.env.example
+!.env.staging.example
+.env.bak*
