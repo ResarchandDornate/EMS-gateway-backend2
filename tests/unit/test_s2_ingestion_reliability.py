@@ -327,7 +327,7 @@ async def test_batch_empty_items_no_write(monkeypatch):
 
 def test_batch_routing_map_unchanged():
     from src.ingestion.router import _BATCH_DEDICATED
-    assert set(_BATCH_DEDICATED) == {"S3", "S4", "S5", "S6", "S7", "S8", "S9"}
+    assert set(_BATCH_DEDICATED) == {"S3", "S4", "S5", "S6", "S7", "S8", "S9", "S10"}
 
 
 # -------------------- 10. no startup/recovery code mutates the historical ledger

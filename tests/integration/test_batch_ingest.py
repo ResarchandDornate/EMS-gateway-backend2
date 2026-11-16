@@ -10,7 +10,7 @@ Decided architecture:
   S7  edge_ai                    -> PostgreSQL JSONB  (edge_ai_inference_records)  [dedicated]
   S8  configuration_audit        -> PostgreSQL JSONB  (configuration_audit_records)[dedicated]
   S9  command_results            -> PostgreSQL JSONB  (command_result_records)     [dedicated]
-  S10 battery_charge_discharge   -> PostgreSQL JSONB  (stream_records)  [generic; unconfirmed]
+  S10 battery_charge_discharge   -> PostgreSQL JSONB  (charge_discharge_records)    [dedicated]
   S2/combiner_box_meter          -> EXCLUDED (not stored)
   anything else                  -> rejected, retryable (kept by gateway)
 
@@ -37,6 +37,7 @@ from src.ingestion.solis_models import SolisTelemetryRecordModel
 from src.ingestion.edge_ai_models import EdgeAiInferenceRecordModel
 from src.ingestion.config_audit_models import ConfigurationAuditRecordModel
 from src.ingestion.command_result_models import CommandResultRecordModel
+from src.ingestion.charge_discharge_models import ChargeDischargeRecordModel
 from src.ingestion.providers import (get_influx_gateway, get_registry_index,
                                       reset_registry_cache)
 from src.tenancy.gateways.models import GatewayModel
@@ -185,6 +186,9 @@ async def _fb(session):
 async def _sr(session):
     return (await session.execute(select(StreamRecordModel))).scalars().all()
 
+async def _cd(session):
+    return (await session.execute(select(ChargeDischargeRecordModel))).scalars().all()
+
 def _points(stub):
     return [p for w in stub.writes for p in w]
 
@@ -225,7 +229,14 @@ async def test_S2_telemetry_goes_to_influx_only(client, session, enabled):
     assert await _ledger(session) == 1           # ledger still records it (idempotency)
 
 
-# ===================== S3-S9 -> dedicated per-stream tables (not generic, not Influx) =====================
+# ===================== S3-S10 -> dedicated per-stream tables (not generic, not Influx) =====================
+
+def _s10_valid():
+    return {"timestamp_utc": TS_Z, "pair_id": 1, "stage": "RUNNING", "run_status": "running",
+            "direction": "charge", "requested_power_kw": 50.0, "commanded_power_kw": 48.0,
+            "actual_power_kw": 47.5, "rack_voltage_v": 1367.3, "rack_soc_percent": 51.9,
+            "available": True, "battery_ready": True, "pcs_running": True,
+            "hard_blocked": False, "platform_ready": True, "active_pairs": [1, 2]}
 
 _DEDICATED = {
     "S3": ("gateway_health", "gateway", _s3_valid, GatewayHealthRecordModel),
@@ -235,6 +246,7 @@ _DEDICATED = {
     "S7": ("edge_ai", "per_bess", _s7_valid, EdgeAiInferenceRecordModel),
     "S8": ("configuration_audit", "gateway", _s8_valid, ConfigurationAuditRecordModel),
     "S9": ("command_results", "commands", _s9_valid, CommandResultRecordModel),
+    "S10": ("battery_charge_discharge_control", "pair_controller", _s10_valid, ChargeDischargeRecordModel),
 }
 
 
@@ -259,7 +271,7 @@ async def test_structured_streams_go_to_dedicated_tables(client, session, enable
     assert _points(stub) == []                        # NOT in Influx
 
 
-async def test_S10_unconfirmed_stays_in_stream_records(client, session, enabled):
+async def test_S10_goes_to_charge_discharge_records(client, session, enabled):
     c, _ = client
     app, stub = enabled
     org, site, gw = await _mk(session)
@@ -268,8 +280,9 @@ async def test_S10_unconfirmed_stays_in_stream_records(client, session, enabled)
                                             [_generic_rec()], message_id=mid)]), headers=_auth(gw))
     assert r.status_code == 200, r.text
     assert r.json()["accepted"] == [{"message_id": str(mid), "status": "accepted"}]
-    sr = await _sr(session)
-    assert len(sr) == 1 and sr[0].stream == "S10" and sr[0].payload["flag"] is True  # verbatim
+    cd = await _cd(session)
+    assert len(cd) == 1 and cd[0].payload["flag"] is True   # verbatim payload preserved
+    assert len(await _sr(session)) == 0                      # NOT in generic stream_records
     assert _points(stub) == [] and len(await _fb(session)) == 0
 
 
@@ -374,9 +387,11 @@ async def test_mixed_batch_routes_each_stream(client, session, enabled):
     assert r.json()["rejected"] == []
     # S1 -> fast_bess_records
     assert {x.message_id for x in await _fb(session)} == {s1}
-    # S4 -> dedicated alarm_event_records; only S10 remains in generic stream_records
-    sr = {x.stream: x.message_id for x in await _sr(session)}
-    assert sr == {"S10": s10}
+    # S4 -> dedicated alarm_event_records; S10 -> dedicated charge_discharge_records.
+    # Nothing is left in the generic stream_records table.
+    assert len(await _sr(session)) == 0
+    cd = await _cd(session)
+    assert len(cd) == 1 and cd[0].message_id == s10
     alarms = (await session.execute(select(AlarmEventRecordModel))).scalars().all()
     assert len(alarms) == 1 and alarms[0].message_id == s4
     # S2 -> Influx only

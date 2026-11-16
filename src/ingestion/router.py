@@ -34,6 +34,8 @@ from src.ingestion.s7_edge_ai import S7EdgeAiEnvelopeIn
 from src.ingestion.edge_ai_service import persist_edge_ai_inference
 from src.ingestion.s9_command_results import S9CommandEnvelopeIn
 from src.ingestion.command_result_service import persist_command_result
+from src.ingestion.s10_charge_discharge import S10ChargeDischargeEnvelopeIn
+from src.ingestion.charge_discharge_service import persist_charge_discharge
 from src.ratelimit import ingest_rate_limit
 from src.ingestion.service import (IngestDecision, canonical_hash, claim_or_resolve,
                                    mark_stored, route_stream, verify_scope)
@@ -169,7 +171,7 @@ async def ingest(
                      record_count=envelope.record_count)
 
 
-# Batch routing: S3-S9 -> dedicated per-stream persisters (Option C). Separate from the
+# Batch routing: S3-S10 -> dedicated per-stream persisters (Option C). Separate from the
 # single-message _STRUCTURED_HANDLERS below, which stays S3/S4/S8 only (unchanged).
 _BATCH_DEDICATED = {
     "S3": (S3HealthEnvelopeIn, persist_health_message),
@@ -179,6 +181,7 @@ _BATCH_DEDICATED = {
     "S7": (S7EdgeAiEnvelopeIn, persist_edge_ai_inference),
     "S8": (S8ConfigAuditEnvelopeIn, persist_config_audit),
     "S9": (S9CommandEnvelopeIn, persist_command_result),
+    "S10": (S10ChargeDischargeEnvelopeIn, persist_charge_discharge),
 }
 
 
@@ -221,7 +224,7 @@ async def _ingest_batch(body, session, gw, influx) -> JSONResponse:
                 envelope_cls = S1FastBessEnvelopeIn
             elif code in _BATCH_DEDICATED:            # S3-S9 use their stream-specific envelope
                 envelope_cls = _BATCH_DEDICATED[code][0]
-            else:                                     # S2, S10, other generic
+            else:                                     # S2 and any other generic stream
                 envelope_cls = GenericStreamEnvelopeIn
             envelope = envelope_cls(**canonical)
         except (ValidationError, TypeError, ValueError) as e:
@@ -248,7 +251,7 @@ async def _ingest_batch(body, session, gw, influx) -> JSONResponse:
                 _persist = _BATCH_DEDICATED[code][1]
                 decision = await _persist(
                     session, gw=gw, identity=identity, envelope=envelope)
-            else:                                         # S10 + other generic -> stream_records (verbatim)
+            else:                                         # other generic -> stream_records (verbatim)
                 decision = await persist_stream_message(
                     session, gw=gw, identity=identity, envelope=envelope)
         except InvalidValue as e:

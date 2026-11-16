@@ -17,6 +17,7 @@ from src.telemetry.dependencies import require_site_read
 from src.ingestion.health_models import GatewayHealthRecordModel as S3M
 from src.ingestion.alarm_models import AlarmEventRecordModel as S4M
 from src.ingestion.controller_models import ControllerStateRecordModel as S5M
+from src.ingestion.charge_discharge_models import ChargeDischargeRecordModel as S10M
 from src.ingestion.solis_models import SolisTelemetryRecordModel as S6M
 from src.ingestion.edge_ai_models import EdgeAiInferenceRecordModel as S7M
 from src.ingestion.config_audit_models import ConfigurationAuditRecordModel as S8M
@@ -296,3 +297,43 @@ async def commands_summary(group_by: str = Query("day"),
     except ranges.RangeError as e:
         raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT, str(e))
     return _summary_resp(site_id, unit, start_dt, stop_dt, buckets)
+
+
+# ---------------- S10 battery_charge_discharge_control / pair_controller ----------------
+@router.get("/charge-discharge/latest")
+async def charge_discharge_latest(gateway_id: uuid.UUID | None = Query(None),
+                                  pair_id: str | None = Query(None),
+                                  run_status: str | None = Query(None),
+                                  limit: int = Query(DEF_LATEST, ge=1, le=MAX_LIMIT),
+                                  site_id: uuid.UUID = Depends(require_site_read),
+                                  session: AsyncSession = Depends(get_session)):
+    """Latest pair-status record per (gateway, pair) for the site. Optional gateway_id / pair_id /
+    run_status filters. [VERIFIED]"""
+    stmt = _eqs(select(S10M).where(S10M.site_id == site_id),
+                (S10M.gateway_id, gateway_id), (S10M.pair_id, pair_id),
+                (S10M.run_status, run_status))
+    stmt = (stmt.distinct(S10M.gateway_id, S10M.pair_id)
+                .order_by(S10M.gateway_id, S10M.pair_id, S10M.received_at_utc.desc())
+                .limit(limit))
+    rows = list((await session.execute(stmt)).scalars().all())
+    return _resp(site_id, rows, False, limit, 0, S.ChargeDischargeOut)
+
+
+@router.get("/charge-discharge/history")
+async def charge_discharge_history(gateway_id: uuid.UUID | None = Query(None),
+                                   pair_id: str | None = Query(None),
+                                   run_status: str | None = Query(None),
+                                   direction: str | None = Query(None),
+                                   start: str | None = Query(None), stop: str | None = Query(None),
+                                   range_: str | None = Query(None, alias="range"),
+                                   limit: int = Query(DEF_HIST, ge=1, le=MAX_LIMIT),
+                                   offset: int = Query(0, ge=0),
+                                   site_id: uuid.UUID = Depends(require_site_read),
+                                   session: AsyncSession = Depends(get_session)):
+    """Per-pair charge/discharge-control history within a window. [VERIFIED]"""
+    start_dt, stop_dt = _window(start, stop, range_)
+    stmt = _hist_stmt(S10M, site_id, S10M.received_at_utc, start_dt, stop_dt, "desc",
+                      (S10M.gateway_id, gateway_id), (S10M.pair_id, pair_id),
+                      (S10M.run_status, run_status), (S10M.direction, direction))
+    rows, more = await _page(session, stmt, limit, offset)
+    return _resp(site_id, rows, more, limit, offset, S.ChargeDischargeOut)

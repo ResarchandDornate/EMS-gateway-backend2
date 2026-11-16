@@ -102,3 +102,27 @@ class CommandOut(BaseModel):             # S9
     requested_value: Any | None
     readback_value: Any | None
     payload: Any
+
+
+class ChargeDischargeOut(BaseModel):     # S10
+    model_config = _C
+    gateway_id: uuid.UUID
+    message_id: uuid.UUID
+    record_index: int
+    pair_id: str | None
+    stage: str | None
+    run_status: str | None
+    direction: str | None
+    requested_power_kw: float | None
+    commanded_power_kw: float | None
+    actual_power_kw: float | None
+    rack_voltage_v: float | None
+    rack_soc_percent: float | None
+    available: bool | None
+    battery_ready: bool | None
+    pcs_running: bool | None
+    hard_blocked: bool | None
+    platform_ready: bool | None
+    sample_time_utc: datetime | None
+    received_at_utc: datetime
+    payload: Any

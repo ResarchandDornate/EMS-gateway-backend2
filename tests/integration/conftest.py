@@ -25,6 +25,7 @@ from src.ingestion import command_result_models as _ingcr  # noqa: F401
 from src.ingestion import fast_bess_models as _ingfb  # noqa: F401
 from src.ingestion import stream_models as _ingsr  # noqa: F401
 from src.ingestion import dead_letter_models as _ingdl  # noqa: F401
+from src.ingestion import charge_discharge_models as _ingcd  # noqa: F401
 from src.auth.otp_provider import MockOtpProvider, get_otp_provider
 from src.database import get_session
 from src.main import app
