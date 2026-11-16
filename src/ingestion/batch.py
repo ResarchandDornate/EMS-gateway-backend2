@@ -10,8 +10,7 @@ JSONB (no explode, no per-signal coercion, no registry lookup) - S1 fast_bess in
 table, S2..S10 in the generic stream store. The single-message endpoint is untouched.
 
 Legacy stream name -> canonical code + substream (Kalpa Central Sync Master Contract v1.1
-STREAM INDEX). S2 carries its substream per message. D1 (downlink) is out of scope and
-S2's combiner_box_meter substream is excluded by contract decision.
+STREAM INDEX). S2 carries its substream per message. D1 (downlink) is out of scope.
 
 Identity (gateway_id / site_id / organization_id) is stamped by the caller from the
 authenticated gateway's DB-resolved identity; the legacy strings in the batch are never
@@ -35,7 +34,9 @@ LEGACY_STREAM_MAP = {
 }
 
 # S2 substreams intentionally NOT ingested (contract decision).
-EXCLUDED_SUBSTREAMS = frozenset({"combiner_box_meter"})
+# combiner_box_meter was previously excluded; CleanEdge v2.0 maps it (ABB MFM,
+# 12 fields) so it is now ingested like any other S2 substream.
+EXCLUDED_SUBSTREAMS = frozenset()
 
 # Upper bound on messages per batch (body size is already capped in body.decode_body).
 MAX_BATCH_MESSAGES = 10_000

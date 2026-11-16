@@ -2533,3 +2533,330 @@ p1083,ornate,S1,bess_fast,bms_1,battery_discharge_over_current_alarm_current_val
 ,kalpa,S2,remote_control,environment,cycle_start_avg_stop_temp,Cycle_Start_Avg_Stop_Temp,,chiller,U16,ON_CHANGE_HEARTBEAT,600,,REMOTE_SETTINGS,T2_1Y,true,W,environment.chiller.cycle_start_avg_stop_temp,DATA S2.8 Remote Control:row33
 ,kalpa,S2,remote_control,environment,cycle_stop_temp_11329,Cycle_Stop_Temp,,chiller,U32,ON_CHANGE_HEARTBEAT,600,,REMOTE_SETTINGS,T2_1Y,true,W,environment.chiller.cycle_stop_temp_11329,DATA S2.8 Remote Control:row34
 ,kalpa,S2,remote_control,environment,cycle_avg_temp,Cycle_Avg_Temp,,chiller,U16,ON_CHANGE_HEARTBEAT,600,,REMOTE_SETTINGS,T2_1Y,true,W,environment.chiller.cycle_avg_temp,DATA S2.8 Remote Control:row35
+,cleanhedge,S2,bess_aux_meter,bms_environment,energy_meter_comm_fault,Energy Meter Comm Fault,,meter,U16,ON_CHANGE_HEARTBEAT,60,,normal,T2_1Y,false,r,telemetry.environment.energy_meter_comm_fault,DATA S2.9 BESS Aux Meter:row15
+,cleanhedge,S2,bess_aux_meter,bms_environment,essmeter_1_1,UA,,meter,U32,PERIODIC,60,,normal,T2_1Y,false,r,telemetry.environment.essmeter_1_1,DATA S2.9 BESS Aux Meter:row16
+,cleanhedge,S2,bess_aux_meter,bms_environment,essmeter_1_2,UB,,meter,U32,PERIODIC,60,,normal,T2_1Y,false,r,telemetry.environment.essmeter_1_2,DATA S2.9 BESS Aux Meter:row17
+,cleanhedge,S2,bess_aux_meter,bms_environment,essmeter_1_3,UC,,meter,U32,PERIODIC,60,,normal,T2_1Y,false,r,telemetry.environment.essmeter_1_3,DATA S2.9 BESS Aux Meter:row18
+,cleanhedge,S2,bess_aux_meter,bms_environment,essmeter_1_4,UAB,,meter,U32,PERIODIC,60,,normal,T2_1Y,false,r,telemetry.environment.essmeter_1_4,DATA S2.9 BESS Aux Meter:row19
+,cleanhedge,S2,bess_aux_meter,bms_environment,essmeter_1_5,UBC,,meter,U32,PERIODIC,60,,normal,T2_1Y,false,r,telemetry.environment.essmeter_1_5,DATA S2.9 BESS Aux Meter:row20
+,cleanhedge,S2,bess_aux_meter,bms_environment,essmeter_1_6,UCA,,meter,U32,PERIODIC,60,,normal,T2_1Y,false,r,telemetry.environment.essmeter_1_6,DATA S2.9 BESS Aux Meter:row21
+,cleanhedge,S2,bess_aux_meter,bms_environment,essmeter_1_7,Ia,,meter,U32,PERIODIC,60,,normal,T2_1Y,false,r,telemetry.environment.essmeter_1_7,DATA S2.9 BESS Aux Meter:row22
+,cleanhedge,S2,bess_aux_meter,bms_environment,essmeter_1_8,Ib,,meter,U32,PERIODIC,60,,normal,T2_1Y,false,r,telemetry.environment.essmeter_1_8,DATA S2.9 BESS Aux Meter:row23
+,cleanhedge,S2,bess_aux_meter,bms_environment,essmeter_1_9,Ic,,meter,U32,PERIODIC,60,,normal,T2_1Y,false,r,telemetry.environment.essmeter_1_9,DATA S2.9 BESS Aux Meter:row24
+,cleanhedge,S2,bess_aux_meter,bms_environment,essmeter_1_10,In,,meter,U32,PERIODIC,60,,normal,T2_1Y,false,r,telemetry.environment.essmeter_1_10,DATA S2.9 BESS Aux Meter:row25
+,cleanhedge,S2,bess_aux_meter,bms_environment,essmeter_1_11,Pa,,meter,U32,PERIODIC,60,,normal,T2_1Y,false,r,telemetry.environment.essmeter_1_11,DATA S2.9 BESS Aux Meter:row26
+,cleanhedge,S2,bess_aux_meter,bms_environment,essmeter_1_12,Pb,,meter,U32,PERIODIC,60,,normal,T2_1Y,false,r,telemetry.environment.essmeter_1_12,DATA S2.9 BESS Aux Meter:row27
+,cleanhedge,S2,bess_aux_meter,bms_environment,essmeter_1_13,Pc,,meter,U32,PERIODIC,60,,normal,T2_1Y,false,r,telemetry.environment.essmeter_1_13,DATA S2.9 BESS Aux Meter:row28
+,cleanhedge,S2,bess_aux_meter,bms_environment,essmeter_1_14,Pt,,meter,U32,PERIODIC,60,,normal,T2_1Y,false,r,telemetry.environment.essmeter_1_14,DATA S2.9 BESS Aux Meter:row29
+,cleanhedge,S2,bess_aux_meter,bms_environment,essmeter_1_15,Qa,,meter,U32,PERIODIC,60,,normal,T2_1Y,false,r,telemetry.environment.essmeter_1_15,DATA S2.9 BESS Aux Meter:row30
+,cleanhedge,S2,bess_aux_meter,bms_environment,essmeter_1_16,Qb,,meter,U32,PERIODIC,60,,normal,T2_1Y,false,r,telemetry.environment.essmeter_1_16,DATA S2.9 BESS Aux Meter:row31
+,cleanhedge,S2,bess_aux_meter,bms_environment,essmeter_1_17,Qc,,meter,U32,PERIODIC,60,,normal,T2_1Y,false,r,telemetry.environment.essmeter_1_17,DATA S2.9 BESS Aux Meter:row32
+,cleanhedge,S2,bess_aux_meter,bms_environment,essmeter_1_18,Qt,,meter,U32,PERIODIC,60,,normal,T2_1Y,false,r,telemetry.environment.essmeter_1_18,DATA S2.9 BESS Aux Meter:row33
+,cleanhedge,S2,bess_aux_meter,bms_environment,essmeter_1_19,SA,,meter,U32,PERIODIC,60,,normal,T2_1Y,false,r,telemetry.environment.essmeter_1_19,DATA S2.9 BESS Aux Meter:row34
+,cleanhedge,S2,bess_aux_meter,bms_environment,essmeter_1_20,SB,,meter,U32,PERIODIC,60,,normal,T2_1Y,false,r,telemetry.environment.essmeter_1_20,DATA S2.9 BESS Aux Meter:row35
+,cleanhedge,S2,bess_aux_meter,bms_environment,essmeter_1_21,SC,,meter,U32,PERIODIC,60,,normal,T2_1Y,false,r,telemetry.environment.essmeter_1_21,DATA S2.9 BESS Aux Meter:row36
+,cleanhedge,S2,bess_aux_meter,bms_environment,essmeter_1_22,ST,,meter,U32,PERIODIC,60,,normal,T2_1Y,false,r,telemetry.environment.essmeter_1_22,DATA S2.9 BESS Aux Meter:row37
+,cleanhedge,S2,bess_aux_meter,bms_environment,essmeter_1_23,PFA,,meter,U32,PERIODIC,60,,normal,T2_1Y,false,r,telemetry.environment.essmeter_1_23,DATA S2.9 BESS Aux Meter:row38
+,cleanhedge,S2,bess_aux_meter,bms_environment,essmeter_1_24,PFB,,meter,U32,PERIODIC,60,,normal,T2_1Y,false,r,telemetry.environment.essmeter_1_24,DATA S2.9 BESS Aux Meter:row39
+,cleanhedge,S2,bess_aux_meter,bms_environment,essmeter_1_25,PFC,,meter,U32,PERIODIC,60,,normal,T2_1Y,false,r,telemetry.environment.essmeter_1_25,DATA S2.9 BESS Aux Meter:row40
+,cleanhedge,S2,bess_aux_meter,bms_environment,essmeter_1_26,PF,,meter,U32,PERIODIC,60,,normal,T2_1Y,false,r,telemetry.environment.essmeter_1_26,DATA S2.9 BESS Aux Meter:row41
+,cleanhedge,S2,bess_aux_meter,bms_environment,essmeter_1_27,F,,meter,U32,PERIODIC,60,,normal,T2_1Y,false,r,telemetry.environment.essmeter_1_27,DATA S2.9 BESS Aux Meter:row42
+,cleanhedge,S2,bess_aux_meter,bms_environment,essmeter_1_28,UN Avg,,meter,U32,PERIODIC,60,,normal,T2_1Y,false,r,telemetry.environment.essmeter_1_28,DATA S2.9 BESS Aux Meter:row43
+,cleanhedge,S2,bess_aux_meter,bms_environment,essmeter_1_29,UL Avg,,meter,U32,PERIODIC,60,,normal,T2_1Y,false,r,telemetry.environment.essmeter_1_29,DATA S2.9 BESS Aux Meter:row44
+,cleanhedge,S2,bess_aux_meter,bms_environment,essmeter_1_30,I Avg,,meter,U32,PERIODIC,60,,normal,T2_1Y,false,r,telemetry.environment.essmeter_1_30,DATA S2.9 BESS Aux Meter:row45
+,cleanhedge,S2,combiner_box_meter,grid_meter,average_current_a,current_a_a,A,meter,FLOAT32,PERIODIC,30,,Meter measurement,T2_1Y,false,r,grid_average_current_a,DATA S2.10 Combiner Box Meter:row21
+,cleanhedge,S2,combiner_box_meter,grid_meter,frequency_hz,frequency_hz,Hz,meter,FLOAT32,PERIODIC,30,,Meter measurement,T2_1Y,false,r,grid_frequency_hz,DATA S2.10 Combiner Box Meter:row41
+,cleanhedge,S2,combiner_box_meter,grid_meter,total_active_power_w,Watts Total,W,meter,FLOAT32,PERIODIC,60,,grid_meter,T2_1Y,false,r,pcc_export_power_kw / grid_import_power_kw / site_load_power_kw,DATA S2.10 Combiner Box Meter:row49
+,cleanhedge,S2,combiner_box_meter,grid_meter,total_reactive_power_var,VAR Total,VAR,meter,FLOAT32,PERIODIC,60,,grid_meter,T2_1Y,false,r,grid_reactive_power_kvar,DATA S2.10 Combiner Box Meter:row50
+,cleanhedge,S2,combiner_box_meter,grid_meter,average_power_factor,PF Average,,meter,FLOAT32,PERIODIC,60,,grid_meter,T2_1Y,false,r,meter_power_factor,DATA S2.10 Combiner Box Meter:row51
+,cleanhedge,S2,combiner_box_meter,grid_meter,total_apparent_power_va,VA Total,VA,meter,FLOAT32,PERIODIC,60,,grid_meter,T2_1Y,false,r,grid_apparent_power_kva,DATA S2.10 Combiner Box Meter:row52
+,cleanhedge,S2,combiner_box_meter,grid_meter,average_line_voltage_v,VLL average,V,meter,FLOAT32,PERIODIC,60,,grid_meter,T2_1Y,false,r,grid_line_voltage_v,DATA S2.10 Combiner Box Meter:row53
+,cleanhedge,S2,combiner_box_meter,grid_meter,average_phase_voltage_v,VLN average,V,meter,FLOAT32,PERIODIC,60,,grid_meter,T2_1Y,false,r,grid_phase_voltage_v,DATA S2.10 Combiner Box Meter:row54
+,cleanhedge,S2,combiner_box_meter,grid_meter,active_energy_received_wh,Wh Received,Wh,meter,FLOAT32,PERIODIC,300,,grid_meter,T3_3Y,false,r,total_export_energy_kwh,DATA S2.10 Combiner Box Meter:row55
+,cleanhedge,S2,combiner_box_meter,grid_meter,active_energy_delivered_wh,Wh Delivered,Wh,meter,FLOAT32,PERIODIC,300,,grid_meter,T3_3Y,false,r,total_grid_import_energy_kwh,DATA S2.10 Combiner Box Meter:row56
+,cleanhedge,S2,combiner_box_meter,grid_meter,meter_communication_status,Derived successful read status,,meter,U16,ON_CHANGE_HEARTBEAT,120,,grid_meter,T2_1Y,false,r,meter_communication_status,DATA S2.10 Combiner Box Meter:row57
+,cleanhedge,S2,solar_inverter,hopecombox,on_grid_active_power,On-grid active power,kW,solar,FLOAT32,PERIODIC,10,,solar_measurement,T2_1Y,false,r,telemetry.solar.hopecombox.on_grid_active_power,DATA S2.11 Solar Inverter:row15
+,cleanhedge,S2,solar_inverter,hopecombox,grid_pickup_active_power,Grid pickup active power,kW,solar,FLOAT32,PERIODIC,10,,solar_measurement,T2_1Y,false,r,telemetry.solar.hopecombox.grid_pickup_active_power,DATA S2.11 Solar Inverter:row16
+,cleanhedge,S2,solar_inverter,hopecombox,active_power_consumed_by_load,Active power consumed by load,kW,solar,FLOAT32,PERIODIC,10,,solar_measurement,T2_1Y,false,r,telemetry.solar.hopecombox.active_power_consumed_by_load,DATA S2.11 Solar Inverter:row17
+,cleanhedge,S2,solar_inverter,hopecombox,total_feed_in_energy,Total feed-in energy,kWh,solar,FLOAT32,PERIODIC,300,,solar_measurement,T3_3Y,false,r,telemetry.solar.hopecombox.total_feed_in_energy,DATA S2.11 Solar Inverter:row18
+,cleanhedge,S2,solar_inverter,hopecombox,total_purchased_energy_from_grid,Total purchased energy from grid,kWh,solar,FLOAT32,PERIODIC,300,,solar_measurement,T3_3Y,false,r,telemetry.solar.hopecombox.total_purchased_energy_from_grid,DATA S2.11 Solar Inverter:row19
+,cleanhedge,S2,solar_inverter,hopecombox,total_energy_consumed_by_load,Total energy consumed by load,kWh,solar,FLOAT32,PERIODIC,300,,solar_measurement,T3_3Y,false,r,telemetry.solar.hopecombox.total_energy_consumed_by_load,DATA S2.11 Solar Inverter:row20
+,cleanhedge,S2,solar_inverter,hopecombox,meter_power_factor,Meter power factor,,solar,FLOAT32,PERIODIC,60,,solar_measurement,T2_1Y,false,r,telemetry.solar.hopecombox.meter_power_factor,DATA S2.11 Solar Inverter:row21
+,cleanhedge,S2,solar_inverter,hopecombox,meter_ct_transformation_ratio,Meter CT transformation ratio,,solar,FLOAT32,PERIODIC,60,,solar_measurement,T2_1Y,false,r,telemetry.solar.hopecombox.meter_ct_transformation_ratio,DATA S2.11 Solar Inverter:row22
+,cleanhedge,S2,solar_inverter,hopecombox,zero_export_control_status,Zero export control status,,solar,S16,ON_CHANGE_HEARTBEAT,120,,solar_status,T2_1Y,false,r,telemetry.solar.hopecombox.zero_export_control_status,DATA S2.11 Solar Inverter:row23
+,cleanhedge,S2,solar_inverter,hopecombox,meter_communication_status,Meter communication status,,solar,U16,ON_CHANGE_HEARTBEAT,120,,solar_status,T2_1Y,false,r,telemetry.solar.hopecombox.meter_communication_status,DATA S2.11 Solar Inverter:row24
+,cleanhedge,S2,solar_inverter,hopecombox,meter_a_phase_active_power,Meter A phase active power,,solar,FLOAT32,PERIODIC,10,,solar_measurement,T2_1Y,false,r,telemetry.solar.hopecombox.meter_a_phase_active_power,DATA S2.11 Solar Inverter:row25
+,cleanhedge,S2,solar_inverter,hopecombox,meter_b_phase_active_power,Meter B phase active power,,solar,FLOAT32,PERIODIC,10,,solar_measurement,T2_1Y,false,r,telemetry.solar.hopecombox.meter_b_phase_active_power,DATA S2.11 Solar Inverter:row26
+,cleanhedge,S2,solar_inverter,hopecombox,meter_c_phase_active_power,Meter C phase active power,,solar,FLOAT32,PERIODIC,10,,solar_measurement,T2_1Y,false,r,telemetry.solar.hopecombox.meter_c_phase_active_power,DATA S2.11 Solar Inverter:row27
+,cleanhedge,S2,solar_inverter,hopecombox,meter_pt_ratio,Meter PT ratio,,solar,FLOAT32,PERIODIC,60,,solar_measurement,T2_1Y,false,r,telemetry.solar.hopecombox.meter_pt_ratio,DATA S2.11 Solar Inverter:row28
+,cleanhedge,S2,solar_inverter,hopecombox,online,Online,,solar,U16,ON_CHANGE_HEARTBEAT,120,,solar_measurement,T2_1Y,false,r,telemetry.solar.hopecombox.online,DATA S2.11 Solar Inverter:row47
+,cleanhedge,S2,solar_inverter,hopecombox,offline,Offline,,solar,U16,ON_CHANGE_HEARTBEAT,120,,solar_measurement,T2_1Y,false,r,telemetry.solar.hopecombox.offline,DATA S2.11 Solar Inverter:row48
+,cleanhedge,S2,solar_inverter,hopecombox,on_grid,On-grid,,solar,U16,PERIODIC,60,,solar_measurement,T2_1Y,false,r,telemetry.solar.hopecombox.on_grid,DATA S2.11 Solar Inverter:row49
+,cleanhedge,S2,solar_inverter,hopecombox,fault,Fault,,solar,U16,ON_CHANGE_HEARTBEAT,60,,solar_measurement,T2_1Y,false,r,telemetry.solar.hopecombox.fault,DATA S2.11 Solar Inverter:row50
+,cleanhedge,S2,solar_inverter,hopecombox,ac_active_power,AC active power,kW,solar,U32,PERIODIC,10,,solar_measurement,T2_1Y,false,r,telemetry.solar.hopecombox.ac_active_power,DATA S2.11 Solar Inverter:row51
+,cleanhedge,S2,solar_inverter,hopecombox,ac_reactive_power,AC reactive power,kVar,solar,S32,PERIODIC,10,,solar_measurement,T2_1Y,false,r,telemetry.solar.hopecombox.ac_reactive_power,DATA S2.11 Solar Inverter:row52
+,cleanhedge,S2,solar_inverter,hopecombox,daily_yield,Daily yield,kW,solar,U32,PERIODIC,60,,solar_measurement,T2_1Y,false,r,telemetry.solar.hopecombox.daily_yield,DATA S2.11 Solar Inverter:row53
+,cleanhedge,S2,solar_inverter,hopecombox,total_yield,Total yield,kWh,solar,U32,PERIODIC,300,,solar_measurement,T3_3Y,false,r,telemetry.solar.hopecombox.total_yield,DATA S2.11 Solar Inverter:row54
+,cleanhedge,S2,solar_inverter,hopecombox,actual_active_regulation,Actual active regulation,kW,solar,U32,PERIODIC,60,,solar_measurement,T2_1Y,false,r,telemetry.solar.hopecombox.actual_active_regulation,DATA S2.11 Solar Inverter:row55
+,cleanhedge,S2,solar_inverter,hopecombox,reactive_kvar_regulation,Reactive kVar regulation,kVar,solar,S32,PERIODIC,60,,solar_measurement,T2_1Y,false,r,telemetry.solar.hopecombox.reactive_kvar_regulation,DATA S2.11 Solar Inverter:row56
+,cleanhedge,S2,solar_inverter,hopecombox,rated_power,Rated Power,kW,solar,U32,ON_CHANGE_HEARTBEAT,21600,,solar_measurement,T2_1Y,false,r,telemetry.solar.hopecombox.rated_power,DATA S2.11 Solar Inverter:row57
+,cleanhedge,S2,solar_inverter,hopecombox,operation_status_of_the_square_array,Operation status of the square array,,solar,U16,ON_CHANGE_HEARTBEAT,120,,solar_status,T2_1Y,false,r,telemetry.solar.hopecombox.operation_status_of_the_square_array,DATA S2.11 Solar Inverter:row58
+,cleanhedge,S2,solar_inverter,hopecombox,inverter_array_operating_state_on_off,Inverter array operating state (on/off),,solar,U16,ON_CHANGE_HEARTBEAT,120,,solar_status,T2_1Y,false,r,telemetry.solar.hopecombox.inverter_array_operating_state_on_off,DATA S2.11 Solar Inverter:row59
+,cleanhedge,S2,solar_inverter,hopecombox,inverter_array_shutdown_state_on_off,Inverter array shutdown state (on/off),,solar,U16,ON_CHANGE_HEARTBEAT,120,,solar_status,T2_1Y,false,r,telemetry.solar.hopecombox.inverter_array_shutdown_state_on_off,DATA S2.11 Solar Inverter:row60
+,cleanhedge,S2,solar_inverter,hopecombox,inverter_array_fault_state_or,Inverter array fault state (or),,solar,U16,ON_CHANGE_HEARTBEAT,60,,solar_status,T2_1Y,false,r,telemetry.solar.hopecombox.inverter_array_fault_state_or,DATA S2.11 Solar Inverter:row61
+,cleanhedge,S2,solar_inverter,hopecombox,inverter_array_fault_state_and,Inverter array fault state (and),,solar,U16,ON_CHANGE_HEARTBEAT,60,,solar_status,T2_1Y,false,r,telemetry.solar.hopecombox.inverter_array_fault_state_and,DATA S2.11 Solar Inverter:row62
+,cleanhedge,S2,pcs_extended,pcs,actual_pq_mode,Actual PQ mode,,pcs,U16,ON_CHANGE_HEARTBEAT,300,,PCS_STATUS,T2_1Y,false,r,telemetry.pcs.actual_pq_mode,DATA S2.2 PCS Extended:row15
+,cleanhedge,S2,pcs_extended,pcs,actual_product_mode,Actual product mode,,pcs,U16,ON_CHANGE_HEARTBEAT,300,,PCS_STATUS,T2_1Y,false,r,telemetry.pcs.actual_product_mode,DATA S2.2 PCS Extended:row16
+,cleanhedge,S2,pcs_extended,pcs,auxiliary_bus_voltage,Auxiliary bus voltage,V,pcs,S16,PERIODIC,60,,PCS_MEASURE,T2_1Y,false,r,telemetry.pcs.auxiliary_bus_voltage,DATA S2.2 PCS Extended:row17
+,cleanhedge,S2,pcs_extended,pcs,cabinet_temperature,Cabinet internal temperature,℃,pcs,S16,PERIODIC,60,,PCS_MEASURE,T2_1Y,false,r,telemetry.pcs.cabinet_temperature,DATA S2.2 PCS Extended:row18
+,cleanhedge,S2,pcs_extended,pcs,can_module_count,CAN communication module count,,pcs,U16,PERIODIC,60,,PCS_MEASURE,T2_1Y,false,r,telemetry.pcs.can_module_count,DATA S2.2 PCS Extended:row19
+,cleanhedge,S2,pcs_extended,pcs,can_receive_life,CAN receive life counter,,pcs,U16,ON_CHANGE_HEARTBEAT,300,,PCS_STATUS,T2_1Y,false,r,telemetry.pcs.can_receive_life,DATA S2.2 PCS Extended:row20
+,cleanhedge,S2,pcs_extended,pcs,system_grid_frequency,System grid frequency,Hz,pcs,FLOAT32,PERIODIC,60,,PCS_TELEMETRY,T1_RAW_90D,false,r,telemetry.pcs.cleanedge_total__system_grid_frequency,DATA S2.2 PCS Extended:row111
+,cleanhedge,S2,pcs_extended,pcs,total_active_power,Total active power,kW,pcs,FLOAT32,PERIODIC,60,,PCS_TELEMETRY,T1_RAW_90D,false,r,telemetry.pcs.cleanedge_total__total_active_power,DATA S2.2 PCS Extended:row112
+,cleanhedge,S2,pcs_extended,pcs,total_power_factor,Total power factor,,pcs,FLOAT32,PERIODIC,60,,PCS_TELEMETRY,T1_RAW_90D,false,r,telemetry.pcs.cleanedge_total__total_power_factor,DATA S2.2 PCS Extended:row113
+,cleanhedge,S2,pcs_extended,pcs,total_reactive_power,Total reactive power,kvar,pcs,FLOAT32,PERIODIC,60,,PCS_TELEMETRY,T1_RAW_90D,false,r,telemetry.pcs.cleanedge_total__total_reactive_power,DATA S2.2 PCS Extended:row114
+,cleanhedge,S2,pcs_extended,pcs,dc_bus_current,DC bus current,A,pcs,S16,PERIODIC,60,,PCS_MEASURE,T2_1Y,false,r,telemetry.pcs.dc_bus_current,DATA S2.2 PCS Extended:row115
+,cleanhedge,S2,pcs_extended,pcs,grid_n_current,Grid neutral current,A,pcs,S16,PERIODIC,60,,PCS_MEASURE,T2_1Y,false,r,telemetry.pcs.grid_n_current,DATA S2.2 PCS Extended:row116
+,cleanhedge,S2,pcs_extended,pcs,igbt_a_temperature,IGBT A temperature,℃,pcs,S16,PERIODIC,60,,PCS_MEASURE,T2_1Y,false,r,telemetry.pcs.igbt_a_temperature,DATA S2.2 PCS Extended:row117
+,cleanhedge,S2,pcs_extended,pcs,igbt_b_temperature,IGBT B temperature,℃,pcs,S16,PERIODIC,60,,PCS_MEASURE,T2_1Y,false,r,telemetry.pcs.igbt_b_temperature,DATA S2.2 PCS Extended:row118
+,cleanhedge,S2,pcs_extended,pcs,igbt_c_temperature,IGBT C temperature,℃,pcs,S16,PERIODIC,60,,PCS_MEASURE,T2_1Y,false,r,telemetry.pcs.igbt_c_temperature,DATA S2.2 PCS Extended:row119
+,cleanhedge,S2,pcs_extended,pcs,operating_state,PCS operating state,,pcs,U16,ON_CHANGE_HEARTBEAT,300,,PCS_STATUS,T2_1Y,false,r,telemetry.pcs.operating_state,DATA S2.2 PCS Extended:row120
+,cleanhedge,S2,pcs_extended,pcs,pcc_ab_voltage,PCC AB line voltage,V,pcs,S16,PERIODIC,60,,PCS_MEASURE,T2_1Y,false,r,telemetry.pcs.pcc_ab_voltage,DATA S2.2 PCS Extended:row121
+,cleanhedge,S2,pcs_extended,pcs,pcc_phase_compensation,PCC phase compensation,deg,pcs,S16,PERIODIC,60,,PCS_MEASURE,T2_1Y,false,r,telemetry.pcs.pcc_phase_compensation,DATA S2.2 PCS Extended:row122
+,cleanhedge,S2,pcs_extended,pcs,phase_a_to_ground_voltage,Phase A to ground voltage,V,pcs,S16,PERIODIC,60,,PCS_MEASURE,T2_1Y,false,r,telemetry.pcs.phase_a_to_ground_voltage,DATA S2.2 PCS Extended:row123
+,cleanhedge,S2,pcs_extended,pcs,phase_b_to_ground_voltage,Phase B to ground voltage,V,pcs,S16,PERIODIC,60,,PCS_MEASURE,T2_1Y,false,r,telemetry.pcs.phase_b_to_ground_voltage,DATA S2.2 PCS Extended:row124
+,cleanhedge,S2,pcs_extended,pcs,phase_c_to_ground_voltage,Phase C to ground voltage,V,pcs,S16,PERIODIC,60,,PCS_MEASURE,T2_1Y,false,r,telemetry.pcs.phase_c_to_ground_voltage,DATA S2.2 PCS Extended:row125
+,cleanhedge,S2,pcs_extended,pcs,reg_1122,IGBT A2 temperature,℃,pcs,S16,PERIODIC,60,,PCS_MEASURE,T2_1Y,false,r,telemetry.pcs.reg_1122,DATA S2.2 PCS Extended:row126
+,cleanhedge,S2,pcs_extended,pcs,reg_1123,IGBT B2 temperature,℃,pcs,S16,PERIODIC,60,,PCS_MEASURE,T2_1Y,false,r,telemetry.pcs.reg_1123,DATA S2.2 PCS Extended:row127
+,cleanhedge,S2,pcs_extended,pcs,reg_1124,IGBT C2 temperature,℃,pcs,S16,PERIODIC,60,,PCS_MEASURE,T2_1Y,false,r,telemetry.pcs.reg_1124,DATA S2.2 PCS Extended:row128
+,cleanhedge,S2,pcs_extended,pcs,reg_1125,IGBT A3 temperature,℃,pcs,S16,PERIODIC,60,,PCS_MEASURE,T2_1Y,false,r,telemetry.pcs.reg_1125,DATA S2.2 PCS Extended:row129
+,cleanhedge,S2,pcs_extended,pcs,reg_1126,IGBT B3 temperature,℃,pcs,S16,PERIODIC,60,,PCS_MEASURE,T2_1Y,false,r,telemetry.pcs.reg_1126,DATA S2.2 PCS Extended:row130
+,cleanhedge,S2,pcs_extended,pcs,reg_1127,IGBT C3 temperature,℃,pcs,S16,PERIODIC,60,,PCS_MEASURE,T2_1Y,false,r,telemetry.pcs.reg_1127,DATA S2.2 PCS Extended:row131
+,cleanhedge,S2,pcs_extended,pcs,reg_1128,IGBT N1 temperature,℃,pcs,S16,PERIODIC,60,,PCS_MEASURE,T2_1Y,false,r,telemetry.pcs.reg_1128,DATA S2.2 PCS Extended:row132
+,cleanhedge,S2,pcs_extended,pcs,reg_1129,IGBT N2 temperature,℃,pcs,S16,PERIODIC,60,,PCS_MEASURE,T2_1Y,false,r,telemetry.pcs.reg_1129,DATA S2.2 PCS Extended:row133
+,cleanhedge,S2,pcs_extended,pcs,reg_112a,IGBT N3 temperature,℃,pcs,S16,PERIODIC,60,,PCS_MEASURE,T2_1Y,false,r,telemetry.pcs.reg_112a,DATA S2.2 PCS Extended:row134
+,cleanhedge,S2,pcs_extended,pcs,reg_112c,PCC BC line voltage,V,pcs,S16,PERIODIC,60,,PCS_MEASURE,T2_1Y,false,r,telemetry.pcs.reg_112c,DATA S2.2 PCS Extended:row135
+,cleanhedge,S2,pcs_extended,pcs,reg_112d,PCC CA line voltage,V,pcs,S16,PERIODIC,60,,PCS_MEASURE,T2_1Y,false,r,telemetry.pcs.reg_112d,DATA S2.2 PCS Extended:row136
+,cleanhedge,S2,pcs_extended,pcs,reg_1206,Port test feedback,,pcs,U16,ON_CHANGE_HEARTBEAT,300,,PCS_STATUS,T2_1Y,false,r,telemetry.pcs.reg_1206,DATA S2.2 PCS Extended:row137
+,cleanhedge,S2,pcs_extended,pcs,reg_1207,Fault waveform read flag,,pcs,U16,ON_CHANGE_HEARTBEAT,300,,PCS_STATUS,T2_1Y,false,r,telemetry.pcs.reg_1207,DATA S2.2 PCS Extended:row138
+,cleanhedge,S2,pcs_extended,pcs,reg_1208,Shutdown fault word,,pcs,U16,ON_CHANGE_HEARTBEAT,300,,PCS_STATUS,T2_1Y,false,r,telemetry.pcs.reg_1208,DATA S2.2 PCS Extended:row139
+,cleanhedge,S2,pcs_extended,pcs,reg_1209,Self-test status word,,pcs,U16,ON_CHANGE_HEARTBEAT,300,,PCS_STATUS,T2_1Y,false,r,telemetry.pcs.reg_1209,DATA S2.2 PCS Extended:row140
+,cleanhedge,S2,pcs_extended,pcs,reg_1217,Module fault word 8,,pcs,U16,ON_CHANGE_HEARTBEAT,300,,PCS_STATUS,T2_1Y,false,r,telemetry.pcs.reg_1217,DATA S2.2 PCS Extended:row141
+,cleanhedge,S2,pcs_extended,pcs,reg_1218,Module fault word 9,,pcs,U16,ON_CHANGE_HEARTBEAT,300,,PCS_STATUS,T2_1Y,false,r,telemetry.pcs.reg_1218,DATA S2.2 PCS Extended:row142
+,cleanhedge,S2,pcs_extended,pcs,reg_1219,Module fault word 10,,pcs,U16,ON_CHANGE_HEARTBEAT,300,,PCS_STATUS,T2_1Y,false,r,telemetry.pcs.reg_1219,DATA S2.2 PCS Extended:row143
+,cleanhedge,S2,pcs_extended,pcs,reg_121a,Module fault word 11,,pcs,U16,ON_CHANGE_HEARTBEAT,300,,PCS_STATUS,T2_1Y,false,r,telemetry.pcs.reg_121a,DATA S2.2 PCS Extended:row144
+,cleanhedge,S2,pcs_extended,pcs,reg_1220,Latched fault word 1,,pcs,U16,ON_CHANGE_HEARTBEAT,300,,PCS_STATUS,T2_1Y,false,r,telemetry.pcs.reg_1220,DATA S2.2 PCS Extended:row145
+,cleanhedge,S2,pcs_extended,pcs,reg_1221,Latched fault word 2,,pcs,U16,ON_CHANGE_HEARTBEAT,300,,PCS_STATUS,T2_1Y,false,r,telemetry.pcs.reg_1221,DATA S2.2 PCS Extended:row146
+,cleanhedge,S2,pcs_extended,pcs,reg_1222,Latched fault word 3,,pcs,U16,ON_CHANGE_HEARTBEAT,300,,PCS_STATUS,T2_1Y,false,r,telemetry.pcs.reg_1222,DATA S2.2 PCS Extended:row147
+,cleanhedge,S2,pcs_extended,pcs,reg_1223,Latched fault word 4,,pcs,U16,ON_CHANGE_HEARTBEAT,300,,PCS_STATUS,T2_1Y,false,r,telemetry.pcs.reg_1223,DATA S2.2 PCS Extended:row148
+,cleanhedge,S2,pcs_extended,pcs,reg_1224,Latched fault word 5,,pcs,U16,ON_CHANGE_HEARTBEAT,300,,PCS_STATUS,T2_1Y,false,r,telemetry.pcs.reg_1224,DATA S2.2 PCS Extended:row149
+,cleanhedge,S2,pcs_extended,pcs,reg_1225,Latched fault word 6,,pcs,U16,ON_CHANGE_HEARTBEAT,300,,PCS_STATUS,T2_1Y,false,r,telemetry.pcs.reg_1225,DATA S2.2 PCS Extended:row150
+,cleanhedge,S2,pcs_extended,pcs,reg_1226,Latched fault word 7,,pcs,U16,ON_CHANGE_HEARTBEAT,300,,PCS_STATUS,T2_1Y,false,r,telemetry.pcs.reg_1226,DATA S2.2 PCS Extended:row151
+,cleanhedge,S2,pcs_extended,pcs,reg_1227,Latched fault word 8,,pcs,U16,ON_CHANGE_HEARTBEAT,300,,PCS_STATUS,T2_1Y,false,r,telemetry.pcs.reg_1227,DATA S2.2 PCS Extended:row152
+,cleanhedge,S2,pcs_extended,pcs,reg_1228,Latched fault word 9,,pcs,U16,ON_CHANGE_HEARTBEAT,300,,PCS_STATUS,T2_1Y,false,r,telemetry.pcs.reg_1228,DATA S2.2 PCS Extended:row153
+,cleanhedge,S2,pcs_extended,pcs,reg_1229,Latched fault word 10,,pcs,U16,ON_CHANGE_HEARTBEAT,300,,PCS_STATUS,T2_1Y,false,r,telemetry.pcs.reg_1229,DATA S2.2 PCS Extended:row154
+,cleanhedge,S2,pcs_extended,pcs,reg_122a,Latched fault word 11,,pcs,U16,ON_CHANGE_HEARTBEAT,300,,PCS_STATUS,T2_1Y,false,r,telemetry.pcs.reg_122a,DATA S2.2 PCS Extended:row155
+,cleanhedge,S2,pcs_extended,pcs,reg_1300,Communication protocol version high word,,pcs,U16,ON_CHANGE_HEARTBEAT,86400,,PCS_VERSION,T2_1Y,false,r,telemetry.pcs.reg_1300,DATA S2.2 PCS Extended:row156
+,cleanhedge,S2,pcs_extended,pcs,reg_1301,Communication protocol version low word,,pcs,U16,ON_CHANGE_HEARTBEAT,86400,,PCS_VERSION,T2_1Y,false,r,telemetry.pcs.reg_1301,DATA S2.2 PCS Extended:row157
+,cleanhedge,S2,pcs_extended,pcs,reg_1302,CPLD software version high word,,pcs,U16,ON_CHANGE_HEARTBEAT,86400,,PCS_VERSION,T2_1Y,false,r,telemetry.pcs.reg_1302,DATA S2.2 PCS Extended:row158
+,cleanhedge,S2,pcs_extended,pcs,reg_1303,CPLD software version low word,,pcs,U16,ON_CHANGE_HEARTBEAT,86400,,PCS_VERSION,T2_1Y,false,r,telemetry.pcs.reg_1303,DATA S2.2 PCS Extended:row159
+,cleanhedge,S2,pcs_extended,pcs,reg_1304,CPU1 software version high word,,pcs,U16,ON_CHANGE_HEARTBEAT,86400,,PCS_VERSION,T2_1Y,false,r,telemetry.pcs.reg_1304,DATA S2.2 PCS Extended:row160
+,cleanhedge,S2,pcs_extended,pcs,reg_1305,CPU1 software version low word,,pcs,U16,ON_CHANGE_HEARTBEAT,86400,,PCS_VERSION,T2_1Y,false,r,telemetry.pcs.reg_1305,DATA S2.2 PCS Extended:row161
+,cleanhedge,S2,pcs_extended,pcs,reg_1306,CPU2 software version high word,,pcs,U16,ON_CHANGE_HEARTBEAT,86400,,PCS_VERSION,T2_1Y,false,r,telemetry.pcs.reg_1306,DATA S2.2 PCS Extended:row162
+,cleanhedge,S2,pcs_extended,pcs,reg_1307,CPU2 software version low word,,pcs,U16,ON_CHANGE_HEARTBEAT,86400,,PCS_VERSION,T2_1Y,false,r,telemetry.pcs.reg_1307,DATA S2.2 PCS Extended:row163
+,cleanhedge,S2,pcs_extended,pcs,reg_1308,CPU1 bootloader version high word,,pcs,U16,ON_CHANGE_HEARTBEAT,86400,,PCS_VERSION,T2_1Y,false,r,telemetry.pcs.reg_1308,DATA S2.2 PCS Extended:row164
+,cleanhedge,S2,pcs_extended,pcs,reg_1309,CPU1 bootloader version low word,,pcs,U16,ON_CHANGE_HEARTBEAT,86400,,PCS_VERSION,T2_1Y,false,r,telemetry.pcs.reg_1309,DATA S2.2 PCS Extended:row165
+,cleanhedge,S2,pcs_extended,pcs,reg_130a,CPU2 bootloader version high word,,pcs,U16,ON_CHANGE_HEARTBEAT,86400,,PCS_VERSION,T2_1Y,false,r,telemetry.pcs.reg_130a,DATA S2.2 PCS Extended:row166
+,cleanhedge,S2,pcs_extended,pcs,reg_130b,CPU2 bootloader version low word,,pcs,U16,ON_CHANGE_HEARTBEAT,86400,,PCS_VERSION,T2_1Y,false,r,telemetry.pcs.reg_130b,DATA S2.2 PCS Extended:row167
+,cleanhedge,S2,pcs_extended,pcs,reg_1400,Remote on/off command,,pcs,U16,ON_CHANGE_HEARTBEAT,21600,,PCS_SETTING,T2_1Y,false,r,telemetry.pcs.reg_1400,DATA S2.2 PCS Extended:row168
+,cleanhedge,S2,pcs_extended,pcs,reg_1401,Local HMI on/off command,,pcs,U16,ON_CHANGE_HEARTBEAT,21600,,PCS_SETTING,T2_1Y,false,r,telemetry.pcs.reg_1401,DATA S2.2 PCS Extended:row169
+,cleanhedge,S2,pcs_extended,pcs,reg_1402,Remote/local mode,,pcs,U16,ON_CHANGE_HEARTBEAT,21600,,PCS_SETTING,T2_1Y,false,r,telemetry.pcs.reg_1402,DATA S2.2 PCS Extended:row170
+,cleanhedge,S2,pcs_extended,pcs,reg_1403,Rated power setting,,pcs,U16,ON_CHANGE_HEARTBEAT,21600,,PCS_SETTING,T2_1Y,false,r,telemetry.pcs.reg_1403,DATA S2.2 PCS Extended:row171
+,cleanhedge,S2,pcs_extended,pcs,reg_1404,Rated grid voltage setting,,pcs,U16,ON_CHANGE_HEARTBEAT,21600,,PCS_SETTING,T2_1Y,false,r,telemetry.pcs.reg_1404,DATA S2.2 PCS Extended:row172
+,cleanhedge,S2,pcs_extended,pcs,reg_1405,Rated grid frequency setting,Hz,pcs,U16,ON_CHANGE_HEARTBEAT,21600,,PCS_SETTING,T2_1Y,false,r,telemetry.pcs.reg_1405,DATA S2.2 PCS Extended:row173
+,cleanhedge,S2,pcs_extended,pcs,reg_1406,Product run mode setting,,pcs,U16,ON_CHANGE_HEARTBEAT,21600,,PCS_SETTING,T2_1Y,false,r,telemetry.pcs.reg_1406,DATA S2.2 PCS Extended:row174
+,cleanhedge,S2,pcs_extended,pcs,reg_1407,PQ work mode setting,,pcs,U16,ON_CHANGE_HEARTBEAT,21600,,PCS_SETTING,T2_1Y,false,r,telemetry.pcs.reg_1407,DATA S2.2 PCS Extended:row175
+,cleanhedge,S2,pcs_extended,pcs,reg_1408,VSG work mode setting,,pcs,U16,ON_CHANGE_HEARTBEAT,21600,,PCS_SETTING,T2_1Y,false,r,telemetry.pcs.reg_1408,DATA S2.2 PCS Extended:row176
+,cleanhedge,S2,pcs_extended,pcs,reg_1409,Active power setpoint,kW,pcs,S16,ON_CHANGE_HEARTBEAT,21600,,PCS_SETTING,T2_1Y,false,r,telemetry.pcs.reg_1409,DATA S2.2 PCS Extended:row177
+,cleanhedge,S2,pcs_extended,pcs,reg_140a,Reactive power setpoint,kVar,pcs,S16,ON_CHANGE_HEARTBEAT,21600,,PCS_SETTING,T2_1Y,false,r,telemetry.pcs.reg_140a,DATA S2.2 PCS Extended:row178
+,cleanhedge,S2,pcs_extended,pcs,reg_140b,Power factor setpoint,,pcs,S16,ON_CHANGE_HEARTBEAT,21600,,PCS_SETTING,T2_1Y,false,r,telemetry.pcs.reg_140b,DATA S2.2 PCS Extended:row179
+,cleanhedge,S2,pcs_extended,pcs,reg_140c,DC voltage setpoint,V,pcs,U16,ON_CHANGE_HEARTBEAT,21600,,PCS_SETTING,T2_1Y,false,r,telemetry.pcs.reg_140c,DATA S2.2 PCS Extended:row180
+,cleanhedge,S2,pcs_extended,pcs,reg_140d,DC current setpoint,A,pcs,S16,ON_CHANGE_HEARTBEAT,21600,,PCS_SETTING,T2_1Y,false,r,telemetry.pcs.reg_140d,DATA S2.2 PCS Extended:row181
+,cleanhedge,S2,pcs_extended,pcs,reg_140e,AC voltage setpoint,V,pcs,U16,ON_CHANGE_HEARTBEAT,21600,,PCS_SETTING,T2_1Y,false,r,telemetry.pcs.reg_140e,DATA S2.2 PCS Extended:row182
+,cleanhedge,S2,pcs_extended,pcs,reg_140f,AC current setpoint,A,pcs,U16,ON_CHANGE_HEARTBEAT,21600,,PCS_SETTING,T2_1Y,false,r,telemetry.pcs.reg_140f,DATA S2.2 PCS Extended:row183
+,cleanhedge,S2,pcs_extended,pcs,reg_1410,Active power ramp rate,pu/s,pcs,U16,ON_CHANGE_HEARTBEAT,21600,,PCS_SETTING,T2_1Y,false,r,telemetry.pcs.reg_1410,DATA S2.2 PCS Extended:row184
+,cleanhedge,S2,pcs_extended,pcs,reg_1411,Reactive power ramp rate,pu/s,pcs,U16,ON_CHANGE_HEARTBEAT,21600,,PCS_SETTING,T2_1Y,false,r,telemetry.pcs.reg_1411,DATA S2.2 PCS Extended:row185
+,cleanhedge,S2,pcs_extended,pcs,reg_1412,DC voltage ramp rate,pu/s,pcs,U16,ON_CHANGE_HEARTBEAT,21600,,PCS_SETTING,T2_1Y,false,r,telemetry.pcs.reg_1412,DATA S2.2 PCS Extended:row186
+,cleanhedge,S2,pcs_extended,pcs,reg_1413,DC current ramp rate,pu/s,pcs,U16,ON_CHANGE_HEARTBEAT,21600,,PCS_SETTING,T2_1Y,false,r,telemetry.pcs.reg_1413,DATA S2.2 PCS Extended:row187
+,cleanhedge,S2,pcs_extended,pcs,reg_1414,AC voltage ramp rate,pu/s,pcs,U16,ON_CHANGE_HEARTBEAT,21600,,PCS_SETTING,T2_1Y,false,r,telemetry.pcs.reg_1414,DATA S2.2 PCS Extended:row188
+,cleanhedge,S2,pcs_extended,pcs,reg_1415,AC current ramp rate,pu/s,pcs,U16,ON_CHANGE_HEARTBEAT,21600,,PCS_SETTING,T2_1Y,false,r,telemetry.pcs.reg_1415,DATA S2.2 PCS Extended:row189
+,cleanhedge,S2,pcs_extended,pcs,reg_1416,Frequency regulation power setting,kW,pcs,U16,ON_CHANGE_HEARTBEAT,21600,,PCS_SETTING,T2_1Y,false,r,telemetry.pcs.reg_1416,DATA S2.2 PCS Extended:row190
+,cleanhedge,S2,pcs_extended,pcs,reg_1417,Grid/island transition command,,pcs,U16,ON_CHANGE_HEARTBEAT,21600,,PCS_SETTING,T2_1Y,false,r,telemetry.pcs.reg_1417,DATA S2.2 PCS Extended:row191
+,cleanhedge,S2,pcs_extended,pcs,reg_1418,High-voltage ride-through reactive compensation,,pcs,U16,ON_CHANGE_HEARTBEAT,21600,,PCS_SETTING,T2_1Y,false,r,telemetry.pcs.reg_1418,DATA S2.2 PCS Extended:row192
+,cleanhedge,S2,pcs_extended,pcs,reg_1419,Low-voltage ride-through reactive compensation,,pcs,U16,ON_CHANGE_HEARTBEAT,21600,,PCS_SETTING,T2_1Y,false,r,telemetry.pcs.reg_1419,DATA S2.2 PCS Extended:row193
+,cleanhedge,S2,pcs_extended,pcs,reg_141a,DC breaker open wait time,min,pcs,U16,ON_CHANGE_HEARTBEAT,21600,,PCS_SETTING,T2_1Y,false,r,telemetry.pcs.reg_141a,DATA S2.2 PCS Extended:row194
+,cleanhedge,S2,pcs_extended,pcs,reg_141b,Factory reset command,,pcs,U16,ON_CHANGE_HEARTBEAT,21600,,PCS_SETTING,T2_1Y,false,r,telemetry.pcs.reg_141b,DATA S2.2 PCS Extended:row195
+,cleanhedge,S2,pcs_extended,pcs,reg_141c,Module ID,,pcs,U16,ON_CHANGE_HEARTBEAT,21600,,PCS_SETTING,T2_1Y,false,r,telemetry.pcs.reg_141c,DATA S2.2 PCS Extended:row196
+,cleanhedge,S2,pcs_extended,pcs,reg_141d,Overload coefficient,,pcs,U16,ON_CHANGE_HEARTBEAT,21600,,PCS_SETTING,T2_1Y,false,r,telemetry.pcs.reg_141d,DATA S2.2 PCS Extended:row197
+,cleanhedge,S2,pcs_extended,pcs,reg_141e,Voltage feedforward filter mode,,pcs,U16,ON_CHANGE_HEARTBEAT,21600,,PCS_SETTING,T2_1Y,false,r,telemetry.pcs.reg_141e,DATA S2.2 PCS Extended:row198
+,cleanhedge,S2,pcs_extended,pcs,reg_141f,Voltage feedforward filter coefficient,,pcs,U16,ON_CHANGE_HEARTBEAT,21600,,PCS_SETTING,T2_1Y,false,r,telemetry.pcs.reg_141f,DATA S2.2 PCS Extended:row199
+,cleanhedge,S2,pcs_extended,pcs,reg_1420,Switching frequency,,pcs,U16,ON_CHANGE_HEARTBEAT,21600,,PCS_SETTING,T2_1Y,false,r,telemetry.pcs.reg_1420,DATA S2.2 PCS Extended:row200
+,cleanhedge,S2,pcs_extended,pcs,reg_1421,PWM modulation mode,,pcs,U16,ON_CHANGE_HEARTBEAT,21600,,PCS_SETTING,T2_1Y,false,r,telemetry.pcs.reg_1421,DATA S2.2 PCS Extended:row201
+,cleanhedge,S2,pcs_extended,pcs,reg_1422,Auxiliary AC/DC supply mode,,pcs,U16,ON_CHANGE_HEARTBEAT,21600,,PCS_SETTING,T2_1Y,false,r,telemetry.pcs.reg_1422,DATA S2.2 PCS Extended:row202
+,cleanhedge,S2,pcs_extended,pcs,reg_1423,Pulse blocking mode,,pcs,U16,ON_CHANGE_HEARTBEAT,21600,,PCS_SETTING,T2_1Y,false,r,telemetry.pcs.reg_1423,DATA S2.2 PCS Extended:row203
+,cleanhedge,S2,pcs_extended,pcs,reg_1424,Pulse blocking time,,pcs,U16,ON_CHANGE_HEARTBEAT,21600,,PCS_SETTING,T2_1Y,false,r,telemetry.pcs.reg_1424,DATA S2.2 PCS Extended:row204
+,cleanhedge,S2,pcs_extended,pcs,reg_1425,EMS pulse blocking enable,,pcs,U16,ON_CHANGE_HEARTBEAT,21600,,PCS_SETTING,T2_1Y,false,r,telemetry.pcs.reg_1425,DATA S2.2 PCS Extended:row205
+,cleanhedge,S2,pcs_extended,pcs,reg_1426,VSG master/slave role,,pcs,U16,ON_CHANGE_HEARTBEAT,21600,,PCS_SETTING,T2_1Y,false,r,telemetry.pcs.reg_1426,DATA S2.2 PCS Extended:row206
+,cleanhedge,S2,pcs_extended,pcs,reg_1427,Test mode,,pcs,U16,ON_CHANGE_HEARTBEAT,21600,,PCS_SETTING,T2_1Y,false,r,telemetry.pcs.reg_1427,DATA S2.2 PCS Extended:row207
+,cleanhedge,S2,pcs_extended,pcs,reg_1428,High-frequency synchronization enable,,pcs,U16,ON_CHANGE_HEARTBEAT,21600,,PCS_SETTING,T2_1Y,false,r,telemetry.pcs.reg_1428,DATA S2.2 PCS Extended:row208
+,cleanhedge,S2,pcs_extended,pcs,reg_1429,Grid-side transformer ratio,,pcs,U16,ON_CHANGE_HEARTBEAT,21600,,PCS_SETTING,T2_1Y,false,r,telemetry.pcs.reg_1429,DATA S2.2 PCS Extended:row209
+,cleanhedge,S2,pcs_extended,pcs,reg_142a,PCC voltage phase compensation,°,pcs,S16,ON_CHANGE_HEARTBEAT,21600,,PCS_SETTING,T2_1Y,false,r,telemetry.pcs.reg_142a,DATA S2.2 PCS Extended:row210
+,cleanhedge,S2,pcs_extended,pcs,reg_142b,PCC switch feedback mode,,pcs,U16,ON_CHANGE_HEARTBEAT,21600,,PCS_SETTING,T2_1Y,false,r,telemetry.pcs.reg_142b,DATA S2.2 PCS Extended:row211
+,cleanhedge,S2,pcs_extended,pcs,reg_142c,Reactive power control mode,,pcs,U16,ON_CHANGE_HEARTBEAT,21600,,PCS_SETTING,T2_1Y,false,r,telemetry.pcs.reg_142c,DATA S2.2 PCS Extended:row212
+,cleanhedge,S2,pcs_extended,pcs,reg_142d,Primary frequency control enable,,pcs,U16,ON_CHANGE_HEARTBEAT,21600,,PCS_SETTING,T2_1Y,false,r,telemetry.pcs.reg_142d,DATA S2.2 PCS Extended:row213
+,cleanhedge,S2,pcs_extended,pcs,reg_142e,Inertia response enable,,pcs,U16,ON_CHANGE_HEARTBEAT,21600,,PCS_SETTING,T2_1Y,false,r,telemetry.pcs.reg_142e,DATA S2.2 PCS Extended:row214
+,cleanhedge,S2,pcs_extended,pcs,reg_142f,Battery insulation detection mode,,pcs,U16,ON_CHANGE_HEARTBEAT,21600,,PCS_SETTING,T2_1Y,false,r,telemetry.pcs.reg_142f,DATA S2.2 PCS Extended:row215
+,cleanhedge,S2,pcs_extended,pcs,reg_1430,Smart charging mode,,pcs,U16,ON_CHANGE_HEARTBEAT,21600,,PCS_SETTING,T2_1Y,false,r,telemetry.pcs.reg_1430,DATA S2.2 PCS Extended:row216
+,cleanhedge,S2,pcs_extended,pcs,reg_1431,Initial battery SOC,,pcs,U16,ON_CHANGE_HEARTBEAT,21600,,PCS_SETTING,T2_1Y,false,r,telemetry.pcs.reg_1431,DATA S2.2 PCS Extended:row217
+,cleanhedge,S2,pcs_extended,pcs,reg_1432,SOC estimation coefficient,,pcs,U16,ON_CHANGE_HEARTBEAT,21600,,PCS_SETTING,T2_1Y,false,r,telemetry.pcs.reg_1432,DATA S2.2 PCS Extended:row218
+,cleanhedge,S2,pcs_extended,pcs,reg_1433,Smart-charge battery capacity,,pcs,U16,ON_CHANGE_HEARTBEAT,21600,,PCS_SETTING,T2_1Y,false,r,telemetry.pcs.reg_1433,DATA S2.2 PCS Extended:row219
+,cleanhedge,S2,pcs_extended,pcs,reg_1434,Smart-charge battery voltage,,pcs,U16,ON_CHANGE_HEARTBEAT,21600,,PCS_SETTING,T2_1Y,false,r,telemetry.pcs.reg_1434,DATA S2.2 PCS Extended:row220
+,cleanhedge,S2,pcs_extended,pcs,reg_1435,Precharge threshold,,pcs,U16,ON_CHANGE_HEARTBEAT,21600,,PCS_SETTING,T2_1Y,false,r,telemetry.pcs.reg_1435,DATA S2.2 PCS Extended:row221
+,cleanhedge,S2,pcs_extended,pcs,reg_1436,Constant-current charge threshold,,pcs,U16,ON_CHANGE_HEARTBEAT,21600,,PCS_SETTING,T2_1Y,false,r,telemetry.pcs.reg_1436,DATA S2.2 PCS Extended:row222
+,cleanhedge,S2,pcs_extended,pcs,reg_1437,Constant-voltage charge threshold,,pcs,U16,ON_CHANGE_HEARTBEAT,21600,,PCS_SETTING,T2_1Y,false,r,telemetry.pcs.reg_1437,DATA S2.2 PCS Extended:row223
+,cleanhedge,S2,pcs_extended,pcs,reg_1438,Precharge current coefficient,,pcs,U16,ON_CHANGE_HEARTBEAT,21600,,PCS_SETTING,T2_1Y,false,r,telemetry.pcs.reg_1438,DATA S2.2 PCS Extended:row224
+,cleanhedge,S2,pcs_extended,pcs,reg_1439,Constant-current charge coefficient,,pcs,U16,ON_CHANGE_HEARTBEAT,21600,,PCS_SETTING,T2_1Y,false,r,telemetry.pcs.reg_1439,DATA S2.2 PCS Extended:row225
+,cleanhedge,S2,pcs_extended,pcs,reg_143a,Constant-voltage charge coefficient,,pcs,U16,ON_CHANGE_HEARTBEAT,21600,,PCS_SETTING,T2_1Y,false,r,telemetry.pcs.reg_143a,DATA S2.2 PCS Extended:row226
+,cleanhedge,S2,pcs_extended,pcs,reg_143b,Float-charge voltage coefficient,,pcs,U16,ON_CHANGE_HEARTBEAT,21600,,PCS_SETTING,T2_1Y,false,r,telemetry.pcs.reg_143b,DATA S2.2 PCS Extended:row227
+,cleanhedge,S2,pcs_extended,pcs,reg_143c,Cumulative discharge energy high word,,pcs,U16,ON_CHANGE_HEARTBEAT,21600,,PCS_COUNTER,T2_1Y,false,r,telemetry.pcs.reg_143c,DATA S2.2 PCS Extended:row228
+,cleanhedge,S2,pcs_extended,pcs,reg_143d,Cumulative discharge energy low word,,pcs,U16,ON_CHANGE_HEARTBEAT,21600,,PCS_COUNTER,T2_1Y,false,r,telemetry.pcs.reg_143d,DATA S2.2 PCS Extended:row229
+,cleanhedge,S2,pcs_extended,pcs,reg_143e,Cumulative charge energy high word,,pcs,U16,ON_CHANGE_HEARTBEAT,21600,,PCS_COUNTER,T2_1Y,false,r,telemetry.pcs.reg_143e,DATA S2.2 PCS Extended:row230
+,cleanhedge,S2,pcs_extended,pcs,reg_143f,Cumulative charge energy low word,,pcs,U16,ON_CHANGE_HEARTBEAT,21600,,PCS_COUNTER,T2_1Y,false,r,telemetry.pcs.reg_143f,DATA S2.2 PCS Extended:row231
+,cleanhedge,S2,pcs_extended,pcs,reg_1440,Discharge energy compensation coefficient,,pcs,U16,ON_CHANGE_HEARTBEAT,21600,,PCS_SETTING,T2_1Y,false,r,telemetry.pcs.reg_1440,DATA S2.2 PCS Extended:row232
+,cleanhedge,S2,pcs_extended,pcs,reg_1441,Charge energy compensation coefficient,,pcs,U16,ON_CHANGE_HEARTBEAT,21600,,PCS_SETTING,T2_1Y,false,r,telemetry.pcs.reg_1441,DATA S2.2 PCS Extended:row233
+,cleanhedge,S2,pcs_extended,pcs,reg_1442,Authorization high word,,pcs,U16,ON_CHANGE_HEARTBEAT,21600,,PCS_IDENTITY,T2_1Y,false,r,telemetry.pcs.reg_1442,DATA S2.2 PCS Extended:row234
+,cleanhedge,S2,pcs_extended,pcs,reg_1443,Authorization low word,,pcs,U16,ON_CHANGE_HEARTBEAT,21600,,PCS_IDENTITY,T2_1Y,false,r,telemetry.pcs.reg_1443,DATA S2.2 PCS Extended:row235
+,cleanhedge,S2,pcs_extended,pcs,reg_1444,Communication-board emergency stop command,,pcs,U16,ON_CHANGE_HEARTBEAT,21600,,PCS_SETTING,T2_1Y,false,r,telemetry.pcs.reg_1444,DATA S2.2 PCS Extended:row236
+,cleanhedge,S2,pcs_extended,pcs,reg_1445,BMS RS485 operating state,,pcs,U16,ON_CHANGE_HEARTBEAT,21600,,PCS_STATUS,T2_1Y,false,r,telemetry.pcs.reg_1445,DATA S2.2 PCS Extended:row237
+,cleanhedge,S2,pcs_extended,pcs,reg_1446,Fault waveform storage flag,,pcs,U16,ON_CHANGE_HEARTBEAT,21600,,PCS_STATUS,T2_1Y,false,r,telemetry.pcs.reg_1446,DATA S2.2 PCS Extended:row238
+,cleanhedge,S2,pcs_extended,pcs,reg_1447,PCS clock year,,pcs,U16,ON_CHANGE_HEARTBEAT,21600,,PCS_CLOCK,T2_1Y,false,r,telemetry.pcs.reg_1447,DATA S2.2 PCS Extended:row239
+,cleanhedge,S2,pcs_extended,pcs,reg_1448,PCS clock month,,pcs,U16,ON_CHANGE_HEARTBEAT,21600,,PCS_CLOCK,T2_1Y,false,r,telemetry.pcs.reg_1448,DATA S2.2 PCS Extended:row240
+,cleanhedge,S2,pcs_extended,pcs,reg_1449,PCS clock day,,pcs,U16,ON_CHANGE_HEARTBEAT,21600,,PCS_CLOCK,T2_1Y,false,r,telemetry.pcs.reg_1449,DATA S2.2 PCS Extended:row241
+,cleanhedge,S2,pcs_extended,pcs,reg_144a,PCS clock hour,,pcs,U16,ON_CHANGE_HEARTBEAT,21600,,PCS_CLOCK,T2_1Y,false,r,telemetry.pcs.reg_144a,DATA S2.2 PCS Extended:row242
+,cleanhedge,S2,pcs_extended,pcs,reg_144b,PCS clock minute,,pcs,U16,ON_CHANGE_HEARTBEAT,21600,,PCS_CLOCK,T2_1Y,false,r,telemetry.pcs.reg_144b,DATA S2.2 PCS Extended:row243
+,cleanhedge,S2,pcs_extended,pcs,reg_144c,PCS clock second,,pcs,U16,ON_CHANGE_HEARTBEAT,21600,,PCS_CLOCK,T2_1Y,false,r,telemetry.pcs.reg_144c,DATA S2.2 PCS Extended:row244
+,cleanhedge,S2,pcs_extended,pcs,reg_1450,Grid-connected runtime high word,,pcs,U16,ON_CHANGE_HEARTBEAT,21600,,PCS_COUNTER,T2_1Y,false,r,telemetry.pcs.reg_1450,DATA S2.2 PCS Extended:row245
+,cleanhedge,S2,pcs_extended,pcs,reg_1451,Grid-connected runtime low word,,pcs,U16,ON_CHANGE_HEARTBEAT,21600,,PCS_COUNTER,T2_1Y,false,r,telemetry.pcs.reg_1451,DATA S2.2 PCS Extended:row246
+,cleanhedge,S2,pcs_extended,pcs,reg_1452,Total charge time high word,,pcs,U16,ON_CHANGE_HEARTBEAT,21600,,PCS_COUNTER,T2_1Y,false,r,telemetry.pcs.reg_1452,DATA S2.2 PCS Extended:row247
+,cleanhedge,S2,pcs_extended,pcs,reg_1453,Total charge time low word,,pcs,U16,ON_CHANGE_HEARTBEAT,21600,,PCS_COUNTER,T2_1Y,false,r,telemetry.pcs.reg_1453,DATA S2.2 PCS Extended:row248
+,cleanhedge,S2,pcs_extended,pcs,reg_1454,Total discharge time high word,,pcs,U16,ON_CHANGE_HEARTBEAT,21600,,PCS_COUNTER,T2_1Y,false,r,telemetry.pcs.reg_1454,DATA S2.2 PCS Extended:row249
+,cleanhedge,S2,pcs_extended,pcs,reg_1455,Total discharge time low word,,pcs,U16,ON_CHANGE_HEARTBEAT,21600,,PCS_COUNTER,T2_1Y,false,r,telemetry.pcs.reg_1455,DATA S2.2 PCS Extended:row250
+,cleanhedge,S2,pcs_extended,pcs,reg_1456,Historical event year,,pcs,U16,ON_CHANGE_HEARTBEAT,21600,,PCS_EVENT_HISTORY,T2_1Y,false,r,telemetry.pcs.reg_1456,DATA S2.2 PCS Extended:row251
+,cleanhedge,S2,pcs_extended,pcs,reg_1457,Historical event month,,pcs,U16,ON_CHANGE_HEARTBEAT,21600,,PCS_EVENT_HISTORY,T2_1Y,false,r,telemetry.pcs.reg_1457,DATA S2.2 PCS Extended:row252
+,cleanhedge,S2,pcs_extended,pcs,reg_1458,Historical event day,,pcs,U16,ON_CHANGE_HEARTBEAT,21600,,PCS_EVENT_HISTORY,T2_1Y,false,r,telemetry.pcs.reg_1458,DATA S2.2 PCS Extended:row253
+,cleanhedge,S2,pcs_extended,pcs,reg_1459,Historical event hour,,pcs,U16,ON_CHANGE_HEARTBEAT,21600,,PCS_EVENT_HISTORY,T2_1Y,false,r,telemetry.pcs.reg_1459,DATA S2.2 PCS Extended:row254
+,cleanhedge,S2,pcs_extended,pcs,reg_145a,Historical event minute,,pcs,U16,ON_CHANGE_HEARTBEAT,21600,,PCS_EVENT_HISTORY,T2_1Y,false,r,telemetry.pcs.reg_145a,DATA S2.2 PCS Extended:row255
+,cleanhedge,S2,pcs_extended,pcs,reg_145b,Historical event second,,pcs,U16,ON_CHANGE_HEARTBEAT,21600,,PCS_EVENT_HISTORY,T2_1Y,false,r,telemetry.pcs.reg_145b,DATA S2.2 PCS Extended:row256
+,cleanhedge,S2,pcs_extended,pcs,reg_145c,Historical event storage address,,pcs,U16,ON_CHANGE_HEARTBEAT,21600,,PCS_EVENT_HISTORY,T2_1Y,false,r,telemetry.pcs.reg_145c,DATA S2.2 PCS Extended:row257
+,cleanhedge,S2,pcs_extended,pcs,reg_145d,Historical event record count,,pcs,U16,ON_CHANGE_HEARTBEAT,21600,,PCS_EVENT_HISTORY,T2_1Y,false,r,telemetry.pcs.reg_145d,DATA S2.2 PCS Extended:row258
+,cleanhedge,S2,pcs_extended,pcs,reg_145e,Primary frequency deadband,Hz,pcs,U16,ON_CHANGE_HEARTBEAT,21600,,PCS_SETTING,T2_1Y,false,r,telemetry.pcs.reg_145e,DATA S2.2 PCS Extended:row259
+,cleanhedge,S2,pcs_extended,pcs,reg_145f,Primary frequency droop,%,pcs,U16,ON_CHANGE_HEARTBEAT,21600,,PCS_SETTING,T2_1Y,false,r,telemetry.pcs.reg_145f,DATA S2.2 PCS Extended:row260
+,cleanhedge,S2,pcs_extended,pcs,reg_1460,Inertia-response frequency deadband,Hz,pcs,U16,ON_CHANGE_HEARTBEAT,21600,,PCS_SETTING,T2_1Y,false,r,telemetry.pcs.reg_1460,DATA S2.2 PCS Extended:row261
+,cleanhedge,S2,pcs_extended,pcs,reg_1461,Inertia-response time constant,s,pcs,U16,ON_CHANGE_HEARTBEAT,21600,,PCS_SETTING,T2_1Y,false,r,telemetry.pcs.reg_1461,DATA S2.2 PCS Extended:row262
+,cleanhedge,S2,pcs_extended,pcs,reg_1462,LVRT positive-sequence reactive coefficient,,pcs,U16,ON_CHANGE_HEARTBEAT,21600,,PCS_SETTING,T2_1Y,false,r,telemetry.pcs.reg_1462,DATA S2.2 PCS Extended:row263
+,cleanhedge,S2,pcs_extended,pcs,reg_1463,LVRT negative-sequence reactive coefficient,,pcs,U16,ON_CHANGE_HEARTBEAT,21600,,PCS_SETTING,T2_1Y,false,r,telemetry.pcs.reg_1463,DATA S2.2 PCS Extended:row264
+,cleanhedge,S2,pcs_extended,pcs,reg_1464,Grid-frequency filter coefficient,,pcs,U16,ON_CHANGE_HEARTBEAT,21600,,PCS_SETTING,T2_1Y,false,r,telemetry.pcs.reg_1464,DATA S2.2 PCS Extended:row265
+,cleanhedge,S2,pcs_extended,pcs,reg_1465,Voltage/reactive-power upper limit,,pcs,U16,ON_CHANGE_HEARTBEAT,21600,,PCS_SETTING,T2_1Y,false,r,telemetry.pcs.reg_1465,DATA S2.2 PCS Extended:row266
+,cleanhedge,S2,pcs_extended,pcs,reg_1466,Voltage/reactive-power lower limit,,pcs,U16,ON_CHANGE_HEARTBEAT,21600,,PCS_SETTING,T2_1Y,false,r,telemetry.pcs.reg_1466,DATA S2.2 PCS Extended:row267
+,cleanhedge,S2,pcs_extended,pcs,reg_1467,Voltage/reactive deadband upper limit,,pcs,U16,ON_CHANGE_HEARTBEAT,21600,,PCS_SETTING,T2_1Y,false,r,telemetry.pcs.reg_1467,DATA S2.2 PCS Extended:row268
+,cleanhedge,S2,pcs_extended,pcs,reg_1468,Voltage/reactive deadband lower limit,,pcs,U16,ON_CHANGE_HEARTBEAT,21600,,PCS_SETTING,T2_1Y,false,r,telemetry.pcs.reg_1468,DATA S2.2 PCS Extended:row269
+,cleanhedge,S2,pcs_extended,pcs,reg_1469,Voltage/reactive cutoff upper limit,,pcs,U16,ON_CHANGE_HEARTBEAT,21600,,PCS_SETTING,T2_1Y,false,r,telemetry.pcs.reg_1469,DATA S2.2 PCS Extended:row270
+,cleanhedge,S2,pcs_extended,pcs,reg_146a,Voltage/reactive cutoff lower limit,,pcs,U16,ON_CHANGE_HEARTBEAT,21600,,PCS_SETTING,T2_1Y,false,r,telemetry.pcs.reg_146a,DATA S2.2 PCS Extended:row271
+,cleanhedge,S2,pcs_extended,pcs,reg_1500,Inverter current-loop Kp,,pcs,U16,ON_CHANGE_HEARTBEAT,21600,,PCS_CONTROL,T2_1Y,false,r,telemetry.pcs.reg_1500,DATA S2.2 PCS Extended:row272
+,cleanhedge,S2,pcs_extended,pcs,reg_1501,Inverter current-loop Ki,,pcs,U16,ON_CHANGE_HEARTBEAT,21600,,PCS_CONTROL,T2_1Y,false,r,telemetry.pcs.reg_1501,DATA S2.2 PCS Extended:row273
+,cleanhedge,S2,pcs_extended,pcs,reg_1502,DC-current outer-loop Kp,,pcs,U16,ON_CHANGE_HEARTBEAT,21600,,PCS_CONTROL,T2_1Y,false,r,telemetry.pcs.reg_1502,DATA S2.2 PCS Extended:row274
+,cleanhedge,S2,pcs_extended,pcs,reg_1503,DC-current outer-loop Ki,,pcs,U16,ON_CHANGE_HEARTBEAT,21600,,PCS_CONTROL,T2_1Y,false,r,telemetry.pcs.reg_1503,DATA S2.2 PCS Extended:row275
+,cleanhedge,S2,pcs_extended,pcs,reg_1504,Repetitive-control gain Kr,,pcs,U16,ON_CHANGE_HEARTBEAT,21600,,PCS_CONTROL,T2_1Y,false,r,telemetry.pcs.reg_1504,DATA S2.2 PCS Extended:row276
+,cleanhedge,S2,pcs_extended,pcs,reg_1505,Repetitive-control lead coefficient k,,pcs,U16,ON_CHANGE_HEARTBEAT,21600,,PCS_CONTROL,T2_1Y,false,r,telemetry.pcs.reg_1505,DATA S2.2 PCS Extended:row277
+,cleanhedge,S2,pcs_extended,pcs,reg_1506,Repetitive-control internal-model coefficient Qz,,pcs,U16,ON_CHANGE_HEARTBEAT,21600,,PCS_CONTROL,T2_1Y,false,r,telemetry.pcs.reg_1506,DATA S2.2 PCS Extended:row278
+,cleanhedge,S2,pcs_extended,pcs,reg_1507,DC-component control Kp,,pcs,U16,ON_CHANGE_HEARTBEAT,21600,,PCS_CONTROL,T2_1Y,false,r,telemetry.pcs.reg_1507,DATA S2.2 PCS Extended:row279
+,cleanhedge,S2,pcs_extended,pcs,reg_1508,DC-component control Ki,,pcs,U16,ON_CHANGE_HEARTBEAT,21600,,PCS_CONTROL,T2_1Y,false,r,telemetry.pcs.reg_1508,DATA S2.2 PCS Extended:row280
+,cleanhedge,S2,pcs_extended,pcs,reg_1509,Zero-sequence control Kp,,pcs,U16,ON_CHANGE_HEARTBEAT,21600,,PCS_CONTROL,T2_1Y,false,r,telemetry.pcs.reg_1509,DATA S2.2 PCS Extended:row281
+,cleanhedge,S2,pcs_extended,pcs,reg_150a,Zero-sequence control Ki,,pcs,U16,ON_CHANGE_HEARTBEAT,21600,,PCS_CONTROL,T2_1Y,false,r,telemetry.pcs.reg_150a,DATA S2.2 PCS Extended:row282
+,cleanhedge,S2,pcs_extended,pcs,reg_150b,Active-damping parameter a0,,pcs,U16,ON_CHANGE_HEARTBEAT,21600,,PCS_CONTROL,T2_1Y,false,r,telemetry.pcs.reg_150b,DATA S2.2 PCS Extended:row283
+,cleanhedge,S2,pcs_extended,pcs,reg_150c,Active-damping parameter a1,,pcs,S16,ON_CHANGE_HEARTBEAT,21600,,PCS_CONTROL,T2_1Y,false,r,telemetry.pcs.reg_150c,DATA S2.2 PCS Extended:row284
+,cleanhedge,S2,pcs_extended,pcs,reg_150d,Active-damping parameter b1,,pcs,S16,ON_CHANGE_HEARTBEAT,21600,,PCS_CONTROL,T2_1Y,false,r,telemetry.pcs.reg_150d,DATA S2.2 PCS Extended:row285
+,cleanhedge,S2,pcs_extended,pcs,reg_150e,DC-bus voltage-loop Kp,,pcs,U16,ON_CHANGE_HEARTBEAT,21600,,PCS_CONTROL,T2_1Y,false,r,telemetry.pcs.reg_150e,DATA S2.2 PCS Extended:row286
+,cleanhedge,S2,pcs_extended,pcs,reg_150f,DC-bus voltage-loop Ki,,pcs,U16,ON_CHANGE_HEARTBEAT,21600,,PCS_CONTROL,T2_1Y,false,r,telemetry.pcs.reg_150f,DATA S2.2 PCS Extended:row287
+,cleanhedge,S2,pcs_extended,pcs,reg_1510,Neutral-point balance Kp,,pcs,U16,ON_CHANGE_HEARTBEAT,21600,,PCS_CONTROL,T2_1Y,false,r,telemetry.pcs.reg_1510,DATA S2.2 PCS Extended:row288
+,cleanhedge,S2,pcs_extended,pcs,reg_1511,Neutral-point balance Ki,,pcs,U16,ON_CHANGE_HEARTBEAT,21600,,PCS_CONTROL,T2_1Y,false,r,telemetry.pcs.reg_1511,DATA S2.2 PCS Extended:row289
+,cleanhedge,S2,pcs_extended,pcs,reg_1512,AC-voltage loop Kp,,pcs,U16,ON_CHANGE_HEARTBEAT,21600,,PCS_CONTROL,T2_1Y,false,r,telemetry.pcs.reg_1512,DATA S2.2 PCS Extended:row290
+,cleanhedge,S2,pcs_extended,pcs,reg_1513,AC-voltage loop Ki,,pcs,U16,ON_CHANGE_HEARTBEAT,21600,,PCS_CONTROL,T2_1Y,false,r,telemetry.pcs.reg_1513,DATA S2.2 PCS Extended:row291
+,cleanhedge,S2,pcs_extended,pcs,reg_1514,AC-voltage regulation rate,,pcs,U16,ON_CHANGE_HEARTBEAT,21600,,PCS_CONTROL,T2_1Y,false,r,telemetry.pcs.reg_1514,DATA S2.2 PCS Extended:row292
+,cleanhedge,S2,pcs_extended,pcs,reg_1515,Grid presynchronization Kp,,pcs,U16,ON_CHANGE_HEARTBEAT,21600,,PCS_CONTROL,T2_1Y,false,r,telemetry.pcs.reg_1515,DATA S2.2 PCS Extended:row293
+,cleanhedge,S2,pcs_extended,pcs,reg_1516,Grid presynchronization Ki,,pcs,U16,ON_CHANGE_HEARTBEAT,21600,,PCS_CONTROL,T2_1Y,false,r,telemetry.pcs.reg_1516,DATA S2.2 PCS Extended:row294
+,cleanhedge,S2,pcs_extended,pcs,reg_1517,Virtual inertia,,pcs,U16,ON_CHANGE_HEARTBEAT,21600,,PCS_CONTROL,T2_1Y,false,r,telemetry.pcs.reg_1517,DATA S2.2 PCS Extended:row295
+,cleanhedge,S2,pcs_extended,pcs,reg_1518,Damping coefficient,,pcs,U16,ON_CHANGE_HEARTBEAT,21600,,PCS_CONTROL,T2_1Y,false,r,telemetry.pcs.reg_1518,DATA S2.2 PCS Extended:row296
+,cleanhedge,S2,pcs_extended,pcs,reg_1519,Primary-frequency coefficient,,pcs,U16,ON_CHANGE_HEARTBEAT,21600,,PCS_CONTROL,T2_1Y,false,r,telemetry.pcs.reg_1519,DATA S2.2 PCS Extended:row297
+,cleanhedge,S2,pcs_extended,pcs,reg_151a,Primary-voltage coefficient,,pcs,U16,ON_CHANGE_HEARTBEAT,21600,,PCS_CONTROL,T2_1Y,false,r,telemetry.pcs.reg_151a,DATA S2.2 PCS Extended:row298
+,cleanhedge,S2,pcs_extended,pcs,reg_151b,VF secondary-frequency Kp,,pcs,U16,ON_CHANGE_HEARTBEAT,21600,,PCS_CONTROL,T2_1Y,false,r,telemetry.pcs.reg_151b,DATA S2.2 PCS Extended:row299
+,cleanhedge,S2,pcs_extended,pcs,reg_151c,VF secondary-frequency Ki,,pcs,U16,ON_CHANGE_HEARTBEAT,21600,,PCS_CONTROL,T2_1Y,false,r,telemetry.pcs.reg_151c,DATA S2.2 PCS Extended:row300
+,cleanhedge,S2,pcs_extended,pcs,reg_151d,VSG amplitude presynchronization Kp,,pcs,U16,ON_CHANGE_HEARTBEAT,21600,,PCS_CONTROL,T2_1Y,false,r,telemetry.pcs.reg_151d,DATA S2.2 PCS Extended:row301
+,cleanhedge,S2,pcs_extended,pcs,reg_151e,VSG amplitude presynchronization Ki,,pcs,U16,ON_CHANGE_HEARTBEAT,21600,,PCS_CONTROL,T2_1Y,false,r,telemetry.pcs.reg_151e,DATA S2.2 PCS Extended:row302
+,cleanhedge,S2,pcs_extended,pcs,reg_152f,Virtual resistance,,pcs,S16,ON_CHANGE_HEARTBEAT,21600,,PCS_CONTROL,T2_1Y,false,r,telemetry.pcs.reg_152f,DATA S2.2 PCS Extended:row303
+,cleanhedge,S2,pcs_extended,pcs,reg_1600,Grid-interface standard,,pcs,U16,ON_CHANGE_HEARTBEAT,86400,,PCS_PROTECTION,T2_1Y,false,r,telemetry.pcs.reg_1600,DATA S2.2 PCS Extended:row304
+,cleanhedge,S2,pcs_extended,pcs,reg_1601,Frequency-protection setting,,pcs,U16,ON_CHANGE_HEARTBEAT,86400,,PCS_PROTECTION,T2_1Y,false,r,telemetry.pcs.reg_1601,DATA S2.2 PCS Extended:row305
+,cleanhedge,S2,pcs_extended,pcs,reg_1602,Ride-through/islanding enable,,pcs,U16,ON_CHANGE_HEARTBEAT,86400,,PCS_PROTECTION,T2_1Y,false,r,telemetry.pcs.reg_1602,DATA S2.2 PCS Extended:row306
+,cleanhedge,S2,pcs_extended,pcs,reg_1603,LVRT overcurrent-prevention enable,,pcs,U16,ON_CHANGE_HEARTBEAT,86400,,PCS_PROTECTION,T2_1Y,false,r,telemetry.pcs.reg_1603,DATA S2.2 PCS Extended:row307
+,cleanhedge,S2,pcs_extended,pcs,reg_1604,Communication-fault level,,pcs,U16,ON_CHANGE_HEARTBEAT,86400,,PCS_PROTECTION,T2_1Y,false,r,telemetry.pcs.reg_1604,DATA S2.2 PCS Extended:row308
+,cleanhedge,S2,pcs_extended,pcs,reg_1605,Hardware-fault level,,pcs,U16,ON_CHANGE_HEARTBEAT,86400,,PCS_PROTECTION,T2_1Y,false,r,telemetry.pcs.reg_1605,DATA S2.2 PCS Extended:row309
+,cleanhedge,S2,pcs_extended,pcs,reg_1606,EMS communication-fault flag,,pcs,U16,ON_CHANGE_HEARTBEAT,86400,,PCS_PROTECTION,T2_1Y,false,r,telemetry.pcs.reg_1606,DATA S2.2 PCS Extended:row310
+,cleanhedge,S2,pcs_extended,pcs,reg_1607,BMS communication-fault flag,,pcs,U16,ON_CHANGE_HEARTBEAT,86400,,PCS_PROTECTION,T2_1Y,false,r,telemetry.pcs.reg_1607,DATA S2.2 PCS Extended:row311
+,cleanhedge,S2,pcs_extended,pcs,reg_1608,Battery overvoltage threshold,V,pcs,U16,ON_CHANGE_HEARTBEAT,86400,,PCS_PROTECTION,T2_1Y,false,r,telemetry.pcs.reg_1608,DATA S2.2 PCS Extended:row312
+,cleanhedge,S2,pcs_extended,pcs,reg_1609,Battery undervoltage threshold,V,pcs,U16,ON_CHANGE_HEARTBEAT,86400,,PCS_PROTECTION,T2_1Y,false,r,telemetry.pcs.reg_1609,DATA S2.2 PCS Extended:row313
+,cleanhedge,S2,pcs_extended,pcs,reg_160a,DC-bus overvoltage limit,V,pcs,U16,ON_CHANGE_HEARTBEAT,86400,,PCS_PROTECTION,T2_1Y,false,r,telemetry.pcs.reg_160a,DATA S2.2 PCS Extended:row314
+,cleanhedge,S2,pcs_extended,pcs,reg_160b,DC-bus undervoltage limit,V,pcs,U16,ON_CHANGE_HEARTBEAT,86400,,PCS_PROTECTION,T2_1Y,false,r,telemetry.pcs.reg_160b,DATA S2.2 PCS Extended:row315
+,cleanhedge,S2,pcs_extended,pcs,reg_160c,AC overcurrent limit,A,pcs,U16,ON_CHANGE_HEARTBEAT,86400,,PCS_PROTECTION,T2_1Y,false,r,telemetry.pcs.reg_160c,DATA S2.2 PCS Extended:row316
+,cleanhedge,S2,pcs_extended,pcs,reg_160d,DC overcurrent limit,A,pcs,U16,ON_CHANGE_HEARTBEAT,86400,,PCS_PROTECTION,T2_1Y,false,r,telemetry.pcs.reg_160d,DATA S2.2 PCS Extended:row317
+,cleanhedge,S2,pcs_extended,pcs,reg_160e,Grid-voltage upper limit 1,%,pcs,U16,ON_CHANGE_HEARTBEAT,86400,,PCS_PROTECTION,T2_1Y,false,r,telemetry.pcs.reg_160e,DATA S2.2 PCS Extended:row318
+,cleanhedge,S2,pcs_extended,pcs,reg_160f,Grid-voltage upper-limit-1 delay,ms,pcs,U16,ON_CHANGE_HEARTBEAT,86400,,PCS_PROTECTION,T2_1Y,false,r,telemetry.pcs.reg_160f,DATA S2.2 PCS Extended:row319
+,cleanhedge,S2,pcs_extended,pcs,reg_1610,Grid-voltage lower limit 1,%,pcs,U16,ON_CHANGE_HEARTBEAT,86400,,PCS_PROTECTION,T2_1Y,false,r,telemetry.pcs.reg_1610,DATA S2.2 PCS Extended:row320
+,cleanhedge,S2,pcs_extended,pcs,reg_1611,Grid-voltage lower-limit-1 delay,ms,pcs,U16,ON_CHANGE_HEARTBEAT,86400,,PCS_PROTECTION,T2_1Y,false,r,telemetry.pcs.reg_1611,DATA S2.2 PCS Extended:row321
+,cleanhedge,S2,pcs_extended,pcs,reg_1612,Grid-voltage upper limit 2,%,pcs,U16,ON_CHANGE_HEARTBEAT,86400,,PCS_PROTECTION,T2_1Y,false,r,telemetry.pcs.reg_1612,DATA S2.2 PCS Extended:row322
+,cleanhedge,S2,pcs_extended,pcs,reg_1613,Grid-voltage upper-limit-2 delay,ms,pcs,U16,ON_CHANGE_HEARTBEAT,86400,,PCS_PROTECTION,T2_1Y,false,r,telemetry.pcs.reg_1613,DATA S2.2 PCS Extended:row323
+,cleanhedge,S2,pcs_extended,pcs,reg_1614,Grid-voltage lower limit 2,%,pcs,U16,ON_CHANGE_HEARTBEAT,86400,,PCS_PROTECTION,T2_1Y,false,r,telemetry.pcs.reg_1614,DATA S2.2 PCS Extended:row324
+,cleanhedge,S2,pcs_extended,pcs,reg_1615,Grid-voltage lower-limit-2 delay,ms,pcs,U16,ON_CHANGE_HEARTBEAT,86400,,PCS_PROTECTION,T2_1Y,false,r,telemetry.pcs.reg_1615,DATA S2.2 PCS Extended:row325
+,cleanhedge,S2,pcs_extended,pcs,reg_1616,Grid-frequency upper limit 1,Hz,pcs,U16,ON_CHANGE_HEARTBEAT,86400,,PCS_PROTECTION,T2_1Y,false,r,telemetry.pcs.reg_1616,DATA S2.2 PCS Extended:row326
+,cleanhedge,S2,pcs_extended,pcs,reg_1617,Grid-frequency upper-limit-1 delay,ms,pcs,U16,ON_CHANGE_HEARTBEAT,86400,,PCS_PROTECTION,T2_1Y,false,r,telemetry.pcs.reg_1617,DATA S2.2 PCS Extended:row327
+,cleanhedge,S2,pcs_extended,pcs,reg_1618,Grid-frequency lower limit 1,Hz,pcs,U16,ON_CHANGE_HEARTBEAT,86400,,PCS_PROTECTION,T2_1Y,false,r,telemetry.pcs.reg_1618,DATA S2.2 PCS Extended:row328
+,cleanhedge,S2,pcs_extended,pcs,reg_1619,Grid-frequency lower-limit-1 delay,ms,pcs,U16,ON_CHANGE_HEARTBEAT,86400,,PCS_PROTECTION,T2_1Y,false,r,telemetry.pcs.reg_1619,DATA S2.2 PCS Extended:row329
+,cleanhedge,S2,pcs_extended,pcs,reg_161a,Grid-frequency upper limit 2,Hz,pcs,U16,ON_CHANGE_HEARTBEAT,86400,,PCS_PROTECTION,T2_1Y,false,r,telemetry.pcs.reg_161a,DATA S2.2 PCS Extended:row330
+,cleanhedge,S2,pcs_extended,pcs,reg_161b,Grid-frequency upper-limit-2 delay,ms,pcs,U16,ON_CHANGE_HEARTBEAT,86400,,PCS_PROTECTION,T2_1Y,false,r,telemetry.pcs.reg_161b,DATA S2.2 PCS Extended:row331
+,cleanhedge,S2,pcs_extended,pcs,reg_161c,Grid-frequency lower limit 2,Hz,pcs,U16,ON_CHANGE_HEARTBEAT,86400,,PCS_PROTECTION,T2_1Y,false,r,telemetry.pcs.reg_161c,DATA S2.2 PCS Extended:row332
+,cleanhedge,S2,pcs_extended,pcs,reg_161d,Grid-frequency lower-limit-2 delay,ms,pcs,U16,ON_CHANGE_HEARTBEAT,86400,,PCS_PROTECTION,T2_1Y,false,r,telemetry.pcs.reg_161d,DATA S2.2 PCS Extended:row333
+,cleanhedge,S2,pcs_extended,pcs,reg_161e,Three-phase current-unbalance limit,%,pcs,U16,ON_CHANGE_HEARTBEAT,86400,,PCS_PROTECTION,T2_1Y,false,r,telemetry.pcs.reg_161e,DATA S2.2 PCS Extended:row334
+,cleanhedge,S2,pcs_extended,pcs,reg_161f,DC-component protection limit,%,pcs,U16,ON_CHANGE_HEARTBEAT,86400,,PCS_PROTECTION,T2_1Y,false,r,telemetry.pcs.reg_161f,DATA S2.2 PCS Extended:row335
+,cleanhedge,S2,pcs_extended,pcs,reg_1620,Grid circulating-current limit,%,pcs,U16,ON_CHANGE_HEARTBEAT,86400,,PCS_PROTECTION,T2_1Y,false,r,telemetry.pcs.reg_1620,DATA S2.2 PCS Extended:row336
+,cleanhedge,S2,pcs_extended,pcs,reg_1621,IGBT overtemperature limit,℃,pcs,U16,ON_CHANGE_HEARTBEAT,86400,,PCS_PROTECTION,T2_1Y,false,r,telemetry.pcs.reg_1621,DATA S2.2 PCS Extended:row337
+,cleanhedge,S2,pcs_extended,pcs,reg_1622,Three-phase temperature-unbalance limit,℃,pcs,U16,ON_CHANGE_HEARTBEAT,86400,,PCS_PROTECTION,T2_1Y,false,r,telemetry.pcs.reg_1622,DATA S2.2 PCS Extended:row338
+,cleanhedge,S2,pcs_extended,pcs,reg_1623,Neutral-point unbalance delay,ms,pcs,U16,ON_CHANGE_HEARTBEAT,86400,,PCS_PROTECTION,T2_1Y,false,r,telemetry.pcs.reg_1623,DATA S2.2 PCS Extended:row339
+,cleanhedge,S2,pcs_extended,pcs,reg_1624,High-frequency synchronization protection delay,s,pcs,U16,ON_CHANGE_HEARTBEAT,86400,,PCS_PROTECTION,T2_1Y,false,r,telemetry.pcs.reg_1624,DATA S2.2 PCS Extended:row340
+,cleanhedge,S2,pcs_extended,pcs,reg_1625,Altitude derating threshold,m,pcs,U16,ON_CHANGE_HEARTBEAT,86400,,PCS_PROTECTION,T2_1Y,false,r,telemetry.pcs.reg_1625,DATA S2.2 PCS Extended:row341
+,cleanhedge,S2,pcs_extended,pcs,reg_1626,IGBT heatsink derating point 1,℃,pcs,U16,ON_CHANGE_HEARTBEAT,86400,,PCS_PROTECTION,T2_1Y,false,r,telemetry.pcs.reg_1626,DATA S2.2 PCS Extended:row342
+,cleanhedge,S2,pcs_extended,pcs,reg_1627,IGBT heatsink derating point 2,℃,pcs,U16,ON_CHANGE_HEARTBEAT,86400,,PCS_PROTECTION,T2_1Y,false,r,telemetry.pcs.reg_1627,DATA S2.2 PCS Extended:row343
+,cleanhedge,S2,pcs_extended,pcs,reg_1628,IGBT heatsink derating point 3,℃,pcs,U16,ON_CHANGE_HEARTBEAT,86400,,PCS_PROTECTION,T2_1Y,false,r,telemetry.pcs.reg_1628,DATA S2.2 PCS Extended:row344
+,cleanhedge,S2,pcs_extended,pcs,reg_1629,DC-bus derating point 1,V,pcs,U16,ON_CHANGE_HEARTBEAT,86400,,PCS_PROTECTION,T2_1Y,false,r,telemetry.pcs.reg_1629,DATA S2.2 PCS Extended:row345
+,cleanhedge,S2,pcs_extended,pcs,reg_162a,DC-bus derating point 2,V,pcs,U16,ON_CHANGE_HEARTBEAT,86400,,PCS_PROTECTION,T2_1Y,false,r,telemetry.pcs.reg_162a,DATA S2.2 PCS Extended:row346
+,cleanhedge,S2,pcs_extended,pcs,reg_162b,SOC upper protection limit,,pcs,U16,ON_CHANGE_HEARTBEAT,86400,,PCS_PROTECTION,T2_1Y,false,r,telemetry.pcs.reg_162b,DATA S2.2 PCS Extended:row347
+,cleanhedge,S2,pcs_extended,pcs,reg_162c,SOC lower protection limit,,pcs,U16,ON_CHANGE_HEARTBEAT,86400,,PCS_PROTECTION,T2_1Y,false,r,telemetry.pcs.reg_162c,DATA S2.2 PCS Extended:row348
+,cleanhedge,S2,pcs_extended,pcs,reg_162d,Cabinet-temperature derating point 1,℃,pcs,U16,ON_CHANGE_HEARTBEAT,86400,,PCS_PROTECTION,T2_1Y,false,r,telemetry.pcs.reg_162d,DATA S2.2 PCS Extended:row349
+,cleanhedge,S2,pcs_extended,pcs,reg_162e,Cabinet-temperature derating point 2,℃,pcs,U16,ON_CHANGE_HEARTBEAT,86400,,PCS_PROTECTION,T2_1Y,false,r,telemetry.pcs.reg_162e,DATA S2.2 PCS Extended:row350
+,cleanhedge,S2,pcs_extended,pcs,reg_162f,Cabinet-temperature derating point 3,℃,pcs,U16,ON_CHANGE_HEARTBEAT,86400,,PCS_PROTECTION,T2_1Y,false,r,telemetry.pcs.reg_162f,DATA S2.2 PCS Extended:row351
+,cleanhedge,S2,pcs_extended,pcs,reg_1630,Communication-fault timeout,ms,pcs,U16,ON_CHANGE_HEARTBEAT,86400,,PCS_PROTECTION,T2_1Y,false,r,telemetry.pcs.reg_1630,DATA S2.2 PCS Extended:row352
+,cleanhedge,S2,pcs_extended,pcs,reg_1631,Heartbeat signal,,pcs,U16,ON_CHANGE_HEARTBEAT,86400,,PCS_PROTECTION,T2_1Y,false,r,telemetry.pcs.reg_1631,DATA S2.2 PCS Extended:row353
+,cleanhedge,S2,pcs_extended,pcs,reg_1632,Input IO function setting,,pcs,U16,ON_CHANGE_HEARTBEAT,86400,,PCS_PROTECTION,T2_1Y,false,r,telemetry.pcs.reg_1632,DATA S2.2 PCS Extended:row354
+,cleanhedge,S2,pcs_extended,pcs,reg_1633,Output IO function setting,,pcs,U16,ON_CHANGE_HEARTBEAT,86400,,PCS_PROTECTION,T2_1Y,false,r,telemetry.pcs.reg_1633,DATA S2.2 PCS Extended:row355
+,cleanhedge,S2,pcs_extended,pcs,reg_1634,Insulation-resistance protection limit,kΩ,pcs,U16,ON_CHANGE_HEARTBEAT,86400,,PCS_PROTECTION,T2_1Y,false,r,telemetry.pcs.reg_1634,DATA S2.2 PCS Extended:row356
+,cleanhedge,S2,pcs_extended,pcs,status_word_1,PCS status word 1,,pcs,U16,ON_CHANGE_HEARTBEAT,300,,PCS_STATUS,T2_1Y,false,r,telemetry.pcs.status_word_1,DATA S2.2 PCS Extended:row357
+,cleanhedge,S2,pcs_extended,pcs,status_word_2,PCS status word 2,,pcs,U16,ON_CHANGE_HEARTBEAT,300,,PCS_STATUS,T2_1Y,false,r,telemetry.pcs.status_word_2,DATA S2.2 PCS Extended:row358
+,cleanhedge,S2,pcs_extended,pcs,status_word_3,PCS status word 3,,pcs,U16,ON_CHANGE_HEARTBEAT,300,,PCS_STATUS,T2_1Y,false,r,telemetry.pcs.status_word_3,DATA S2.2 PCS Extended:row359
