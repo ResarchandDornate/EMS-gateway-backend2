@@ -44,6 +44,7 @@ class IngestDecision(str, Enum):
     DUPLICATE_STORED = "duplicate_stored"
     IN_PROGRESS = "in_progress"
     HASH_MISMATCH = "hash_mismatch"       # -> 409 at HTTP layer (9b-ii)
+    DEAD_LETTERED = "dead_lettered"       # row is terminal 'failed' (audit D-13); non-retryable
 
 
 def route_stream(stream: str) -> str:
@@ -132,6 +133,12 @@ async def claim_or_resolve(session, *, gateway_id, stream, message_id,
         if row.status == "stored":
             await session.rollback()
             return IngestDecision.DUPLICATE_STORED, None
+        if row.status == "failed":
+            # Terminal: this message was permanently dead-lettered (audit D-13). A resend of
+            # the identical payload is idempotently re-dropped (non-retryable) so it can never
+            # start an infinite replay loop. Manual replay goes through the DLQ, not here.
+            await session.rollback()
+            return IngestDecision.DEAD_LETTERED, None
         if row.lease_expires_at is not None and row.lease_expires_at > now:
             await session.rollback()
             return IngestDecision.IN_PROGRESS, None
@@ -185,4 +192,33 @@ async def mark_stored(session, *, gateway_id, message_id, token) -> bool:
             await session.rollback()
         except Exception:
             pass          # keep the original error; a failed rollback must not mask it
+        raise
+
+
+async def mark_failed(session, *, gateway_id, message_id, token) -> bool:
+    """CAS transition pending -> failed for a PERMANENTLY unstorable message (audit D-13).
+
+    Mirror of mark_stored: matches (gateway_id, message_id, status='pending',
+    lease_owner=token) and sets status='failed'. Returns True iff exactly one row changed.
+    Only the lease owner can fail its own row, so a stolen/already-resolved row is untouched
+    (0 rows -> False). Callers invoke this ONLY after durably recording the message in the
+    dead-letter table, so a 'failed' ledger row is always backed by a replayable DLQ row.
+    NEVER touches rows it does not own, so historical pending messages are never affected."""
+    try:
+        row = (await session.execute(
+            update(IngestMessageModel)
+            .where(IngestMessageModel.gateway_id == gateway_id,
+                   IngestMessageModel.message_id == message_id,
+                   IngestMessageModel.status == "pending",
+                   IngestMessageModel.lease_owner == token)
+            .values(status="failed")
+            .returning(IngestMessageModel.id)
+        )).scalar_one_or_none()
+        await session.commit()
+        return row is not None
+    except Exception:
+        try:
+            await session.rollback()
+        except Exception:
+            pass
         raise

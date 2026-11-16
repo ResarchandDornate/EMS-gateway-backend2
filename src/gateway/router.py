@@ -1,7 +1,7 @@
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from src.auth.security import GATEWAY_TOKEN_MINUTES, create_gateway_token, verify_password
+from src.auth.security import GATEWAY_TOKEN_MINUTES, create_gateway_token, verify_password_async
 from src.database import get_session
 from src.gateway import service
 from src.gateway.dependencies import get_current_gateway
@@ -16,7 +16,7 @@ async def gateway_token(body: GatewayTokenRequest, session: AsyncSession = Depen
                         _rl=Depends(token_rate_limit)):
     gw = await service.get_gateway_by_client_id(session, body.client_id)
     # generic 401 for unknown client OR bad secret (do not reveal which)
-    if gw is None or not verify_password(body.client_secret, gw.client_secret_hash):
+    if gw is None or not await verify_password_async(body.client_secret, gw.client_secret_hash):
         raise HTTPException(status.HTTP_401_UNAUTHORIZED, "Invalid credentials")
     if not gw.enabled:
         raise HTTPException(status.HTTP_403_FORBIDDEN, "Gateway disabled")

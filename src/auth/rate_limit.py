@@ -40,6 +40,16 @@ async def _evaluate_otp(request: Request, *, policy: "Policy | None", key: str, 
               key_hash=_hash_key(key), retry_after=round(dec.retry_after, 3))
 
 
+# ---- /login (password) ----
+async def login_ip_rate_limit(request: Request) -> None:
+    """Per-IP limiter for password login (audit D-10). Inert unless otp_rate_limit_enabled
+    AND login_ip_capacity/refill are configured; shadow (log-only) unless *_enforce."""
+    s = get_settings()
+    await _evaluate_otp(
+        request, policy=_policy(s.login_ip_capacity, s.login_ip_refill_per_sec),
+        key=f"rl:login:ip:{_client_ip(request)}", key_kind="ip")
+
+
 # ---- /otp/request ----
 async def otp_request_ip_rate_limit(request: Request) -> None:
     s = get_settings()

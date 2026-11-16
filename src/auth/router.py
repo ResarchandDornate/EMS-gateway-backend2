@@ -15,8 +15,9 @@ from src.auth.security import create_access_token, decode_access_token
 from src.auth.service import (OTP_ROLES, authenticate, get_role_names,
                              resolve_channel)
 from src.database import get_session
-from src.auth.rate_limit import (otp_request_ip_rate_limit, otp_request_user_limit,
-                                 otp_verify_ip_rate_limit, otp_verify_user_limit)
+from src.auth.rate_limit import (login_ip_rate_limit, otp_request_ip_rate_limit,
+                                 otp_request_user_limit, otp_verify_ip_rate_limit,
+                                 otp_verify_user_limit)
 from src.config import get_settings
 import structlog
 
@@ -27,7 +28,9 @@ _otp_log = structlog.get_logger("otp_ratelimit")
 
 # --- Super Admin: password ---
 @router.post("/login", response_model=TokenResponse)
-async def login(body: LoginRequest, session: AsyncSession = Depends(get_session)):
+async def login(body: LoginRequest, request: Request,
+                session: AsyncSession = Depends(get_session),
+                _ip_rl=Depends(login_ip_rate_limit)):
     user = await authenticate(session, body.identifier, body.password)
     if user is None:
         raise HTTPException(status.HTTP_401_UNAUTHORIZED, "Invalid credentials")

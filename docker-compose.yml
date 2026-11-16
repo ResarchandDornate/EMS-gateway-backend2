@@ -3,7 +3,7 @@ services:
     image: postgres:16
     environment:
       POSTGRES_USER: ems
-      POSTGRES_PASSWORD: 7a5bdd90496fdf09823a79aaa6b3464720f92673e3d21d5b
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env}
       POSTGRES_DB: ems
     ports: ["5436:5432"]
     volumes: [pgdata:/var/lib/postgresql/data]
@@ -19,11 +19,11 @@ services:
     environment:
       DOCKER_INFLUXDB_INIT_MODE: setup
       DOCKER_INFLUXDB_INIT_USERNAME: admin
-      DOCKER_INFLUXDB_INIT_PASSWORD: ems_dev_password
+      DOCKER_INFLUXDB_INIT_PASSWORD: ${INFLUXDB_ADMIN_PASSWORD:?set INFLUXDB_ADMIN_PASSWORD in .env}
       DOCKER_INFLUXDB_INIT_ORG: unityess
       DOCKER_INFLUXDB_INIT_BUCKET: telemetry_1y
       DOCKER_INFLUXDB_INIT_RETENTION: 365d
-      DOCKER_INFLUXDB_INIT_ADMIN_TOKEN: ems_dev_token
+      DOCKER_INFLUXDB_INIT_ADMIN_TOKEN: ${INFLUXDB_ADMIN_TOKEN:?set INFLUXDB_ADMIN_TOKEN in .env}
     ports: ["8086:8086"]
     volumes: [influxdata:/var/lib/influxdb2]
     healthcheck:
@@ -40,7 +40,7 @@ services:
     entrypoint: ["/bin/sh", "-c"]
     command:
       - >
-        influx bucket create --host http://influxdb:8086 --token ems_dev_token
+        influx bucket create --host http://influxdb:8086 --token ${INFLUXDB_ADMIN_TOKEN:?set INFLUXDB_ADMIN_TOKEN in .env}
         --org unityess --name telemetry_raw_90d --retention 90d
         || echo "telemetry_raw_90d already exists"
 
@@ -60,7 +60,7 @@ services:
     env_file: .env
     environment:
       # container-network hosts override the localhost ones in .env
-      DATABASE_URL: postgresql+asyncpg://ems:7a5bdd90496fdf09823a79aaa6b3464720f92673e3d21d5b@postgres:5432/ems
+      DATABASE_URL: postgresql+asyncpg://ems:${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env}@postgres:5432/ems
       INFLUX_URL: http://influxdb:8086
       REDIS_URL: redis://redis:6379/0
       CORS_ALLOWED_ORIGINS: https://ems-dashboard.unityess.cloud

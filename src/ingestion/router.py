@@ -92,6 +92,8 @@ async def _process_numeric_envelope(envelope, *, session, gw, identity, index, i
         raise _NumericError(status.HTTP_409_CONFLICT, "message_id reused with a different payload")
     if decision == IngestDecision.IN_PROGRESS:
         raise _NumericError(status.HTTP_409_CONFLICT, "message is already being processed")
+    if decision == IngestDecision.DEAD_LETTERED:
+        raise _NumericError(status.HTTP_409_CONFLICT, "message permanently failed (dead-lettered)")
 
     try:
         await influx.write_built(built)
@@ -269,6 +271,10 @@ async def _ingest_batch(body, session, gw, influx) -> JSONResponse:
         elif decision == IngestDecision.IN_PROGRESS:
             _reject(str(envelope.message_id), "temporary_backend_unavailable",
                     "message is already being processed", retryable=True)
+        elif decision == IngestDecision.DEAD_LETTERED:
+            # terminal permanent failure (audit D-13): captured in the DLQ, do NOT retry
+            _reject(str(envelope.message_id), "permanently_failed",
+                    "message permanently failed and was captured for review", retryable=False)
         else:  # CLAIMED / RECLAIMED -> stored this delivery
             accepted.append({"message_id": str(envelope.message_id), "status": "accepted"})
 
@@ -293,6 +299,10 @@ async def _ingest_batch(body, session, gw, influx) -> JSONResponse:
             elif outcome == IngestDecision.IN_PROGRESS:
                 _reject(str(envelope.message_id), "temporary_backend_unavailable",
                         "message is already being processed", retryable=True)
+            elif outcome == "dead_lettered" or outcome == IngestDecision.DEAD_LETTERED:
+                # permanent S2 write failure (audit D-13): captured in the DLQ, non-retryable
+                _reject(str(envelope.message_id), "permanently_failed",
+                        "message permanently failed and was captured for review", retryable=False)
             else:  # write_failed / not_confirmed / missing -> keep on the gateway
                 _reject(str(envelope.message_id), "temporary_backend_unavailable",
                         "store not confirmed; retry", retryable=True)
@@ -340,5 +350,7 @@ async def _ingest_structured(body, session, gw) -> IngestAck:
         raise HTTPException(status.HTTP_409_CONFLICT, "message_id reused with a different payload")
     if decision == IngestDecision.IN_PROGRESS:
         raise HTTPException(status.HTTP_409_CONFLICT, "message is already being processed")
+    if decision == IngestDecision.DEAD_LETTERED:
+        raise HTTPException(status.HTTP_409_CONFLICT, "message permanently failed (dead-lettered)")
     return IngestAck(status="stored", message_id=envelope.message_id,
                      record_count=envelope.record_count)

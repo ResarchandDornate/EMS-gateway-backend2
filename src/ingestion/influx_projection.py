@@ -7,8 +7,17 @@ into InfluxDB.
 
 S2 -> one point per record, measurement s2_<substream>, asset tag = runtime_asset_id, long
 (1y) bucket - except the 12 energy/capacity signals which route to the 3y bucket. Native
-field types (float / bool / string; nulls skipped; lists/dicts JSON-encoded). Registry is
-bypassed (real signal names do not match it). Never raises: a bad signal is skipped.
+field types (float / bool / string; null readings skipped; lists/dicts JSON-encoded).
+Registry is bypassed (real signal names do not match it).
+
+Validity contract (fix for the batch S2 silent-loss defect): a record whose ``value`` is
+null is a NULL READING and is intentionally not stored (not a loss). ANY OTHER unshapeable
+record - a non-object record, a missing/blank ``signal``, an unencodable ``value``, or a
+record with no parseable timestamp - is INVALID and raises ``InvalidValue`` so the whole
+message is rejected BEFORE it is claimed/stored. This mirrors the single-message numeric
+path (``build_message_points``), so a malformed S2 record can no longer be dropped while
+the message is ACKed ``accepted``. The caller already rejects ``InvalidValue`` as
+``retryable:true`` (gateway keeps the data).
 """
 import json
 
@@ -55,10 +64,8 @@ def _ts(*candidates):
     return None
 
 
-def _point(meas, tags: dict, signal_key, value, quality, dt):
-    fv = _field(value)
-    if fv is None or dt is None or not isinstance(signal_key, str) or not signal_key:
-        return None
+def _point(meas, tags: dict, signal_key, fv, quality, dt):
+    """Build a Point from an ALREADY-VALIDATED field value `fv` (never None) and `dt`."""
     pt = Point(meas)
     for k, val in tags.items():
         if val:
@@ -70,34 +77,45 @@ def _point(meas, tags: dict, signal_key, value, quality, dt):
 
 
 def _s2_points(envelope, identity, settings):
+    """Project every S2 record into (bucket, Point). A null-valued record is skipped
+    (null reading); any other unshapeable record raises InvalidValue so the whole message
+    is rejected before claim/store."""
     meas = measurement_for("S2", envelope.substream)
     base = {"organization_id": str(identity["organization_id"]),
             "site_id": str(identity["site_id"]),
             "gateway_id": str(identity["gateway_id"]),
             "substream": envelope.substream}
     out = []
-    for rec in envelope.records:
+    for i, rec in enumerate(envelope.records):
         if not isinstance(rec, dict):
-            continue
+            raise InvalidValue(f"S2 record[{i}] is not an object")
+        value = rec.get("value")
+        if value is None:
+            continue                                   # null reading: not stored, not a loss
         signal = rec.get("signal")
+        if not isinstance(signal, str) or not signal:
+            raise InvalidValue(f"S2 record[{i}] has a missing or blank 'signal'")
+        fv = _field(value)
+        if fv is None:                                 # non-null value that cannot be encoded
+            raise InvalidValue(f"S2 signal {signal!r} has an unencodable value")
+        dt = _ts(rec.get("source_updated_utc"), rec.get("observed_at_utc"), envelope.created_at_utc)
+        if dt is None:
+            raise InvalidValue(f"S2 signal {signal!r} has no parseable timestamp")
         tags = {**base, "source_id": rec.get("source_id"),
                 "asset_id": rec.get("runtime_asset_id") or rec.get("base_asset_id")}
-        dt = _ts(rec.get("source_updated_utc"), rec.get("observed_at_utc"), envelope.created_at_utc)
-        pt = _point(meas, tags, signal, rec.get("value"), rec.get("quality"), dt)
-        if pt is None:
-            continue
         bucket = (settings.influx_bucket_3y if signal in ENERGY_T3_SIGNALS
                   else settings.influx_bucket_long)
-        out.append((bucket, pt))
+        out.append((bucket, _point(meas, tags, signal, fv, rec.get("quality"), dt)))
     return out
 
 
 def build_influx_points(envelope, identity, settings):
-    """Return [(bucket, Point), ...] for S2 numeric telemetry; [] for any other stream
-    or on any shaping error (so Postgres paths are never blocked)."""
-    try:
-        if envelope.stream == "S2":
-            return _s2_points(envelope, identity, settings)
-    except Exception:
-        return []
+    """Return [(bucket, Point), ...] for S2 numeric telemetry; [] for any non-S2 stream.
+
+    Raises InvalidValue on any invalid S2 record (see module docstring). It no longer
+    swallows shaping errors: the previous blanket `except -> []` allowed malformed records
+    to vanish while the message was still ACKed accepted. Callers reject InvalidValue as
+    retryable, so no data is lost and nothing is falsely accepted."""
+    if getattr(envelope, "stream", None) == "S2":
+        return _s2_points(envelope, identity, settings)
     return []

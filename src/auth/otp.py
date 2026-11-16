@@ -5,7 +5,7 @@ from sqlalchemy import delete, func, select, text, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.auth.models import OtpChallengeModel
-from src.auth.security import hash_password, verify_password
+from src.auth.security import hash_password_async, verify_password_async
 
 OTP_LENGTH = 6
 OTP_TTL_MINUTES = 5
@@ -18,9 +18,10 @@ def generate_code(length: int = OTP_LENGTH) -> str:
 
 async def create_challenge(session: AsyncSession, *, user_id, channel: str, destination: str) -> str:
     code = generate_code()
+    otp_hash = await hash_password_async(code)
     session.add(OtpChallengeModel(
         user_id=user_id, channel=channel, destination=destination,
-        otp_hash=hash_password(code),
+        otp_hash=otp_hash,
         expires_at=datetime.now(timezone.utc) + timedelta(minutes=OTP_TTL_MINUTES)))
     await session.flush()
     return code
@@ -38,7 +39,7 @@ async def verify_code(session: AsyncSession, *, user_id, code: str) -> bool:
     if ch is None or ch.attempts >= OTP_MAX_ATTEMPTS:
         return False
     ch.attempts += 1
-    if not verify_password(code, ch.otp_hash):
+    if not await verify_password_async(code, ch.otp_hash):
         await session.flush()
         return False
     ch.consumed_at = now          # single-use

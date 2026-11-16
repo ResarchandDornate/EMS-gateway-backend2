@@ -3,7 +3,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.auth.models import UserModel
 from src.auth.repository import UserRepository
-from src.auth.security import verify_password
+from src.auth.security import verify_password_async
 from src.rbac.models import RoleModel, UserRoleModel
 
 OTP_ROLES = {"org_admin", "site_operator"}
@@ -13,7 +13,7 @@ async def authenticate(session: AsyncSession, identifier: str, password: str) ->
     user = await UserRepository(session).get_by_identifier(identifier)
     if user is None or not user.is_active or user.password_hash is None:
         return None
-    if not verify_password(password, user.password_hash):
+    if not await verify_password_async(password, user.password_hash):
         return None
     return user
 

@@ -20,6 +20,7 @@ from src.ingestion.stream_models import StreamRecordModel
 from src.ingestion.health_service import StoreNotConfirmed
 from src.ingestion.generic_stream import GenericStreamEnvelopeIn
 from src.ingestion.s3_health import parse_record_timestamp
+from src.ingestion.dead_letter_service import record_dead_letter
 from src.ingestion.service import (IngestDecision, canonical_hash, claim_or_resolve,
                                    mark_stored)
 from src.telemetry_errors import InvalidValue, UnsafeQueryInput
@@ -35,7 +36,7 @@ except Exception:                                 # pragma: no cover - aiohttp a
     _AIOHTTP_CLIENT_ERRORS = ()
 
 _RESOLVED = {IngestDecision.DUPLICATE_STORED, IngestDecision.HASH_MISMATCH,
-             IngestDecision.IN_PROGRESS}
+             IngestDecision.IN_PROGRESS, IngestDecision.DEAD_LETTERED}
 
 _log = structlog.get_logger("ingest.s2")
 
@@ -305,9 +306,23 @@ async def persist_influx_batch(session, *, gw, identity: dict, items, influx) ->
         try:
             await _write_with_retry(influx, combined_points, log_fields={
                 "gateway_id": str(gw.id), "stream": "S2", "batch_messages": len(claimed)})
-        except Exception:
-            # Already logged inside _write_with_retry. The whole bulk write failed, so EVERY
-            # claimed row stays 'pending' (retryable) -- never confirm any as stored.
+        except Exception as exc:
+            # Already logged inside _write_with_retry. Distinguish transient vs permanent
+            # (audit D-13): a TRANSIENT failure leaves every claimed row 'pending' so the
+            # gateway keeps retrying (unchanged). A PERMANENT failure (4xx / bad bucket /
+            # deterministic defect) can never succeed on retry, so each claimed message is
+            # durably dead-lettered and its ledger row transitioned pending -> failed; the
+            # caller then rejects it NON-retryable so the gateway stops the infinite resend.
+            if _classify_write_error(exc) == "permanent":
+                for envelope, token in claimed:
+                    try:
+                        await record_dead_letter(
+                            session, gw=gw, identity=identity, envelope=envelope, token=token,
+                            error_code="influx_write_permanent", detail=type(exc).__name__)
+                        results[envelope.message_id] = "dead_lettered"
+                    except Exception:
+                        results[envelope.message_id] = "write_failed"   # DLQ failed -> keep retryable
+                return results
             for envelope, _ in claimed:
                 results[envelope.message_id] = "write_failed"
             return results

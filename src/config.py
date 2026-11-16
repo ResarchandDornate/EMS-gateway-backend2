@@ -90,6 +90,11 @@ class Settings(BaseSettings):
     otp_verify_ip_refill_per_sec: float | None = None
     otp_verify_user_capacity: int | None = None
     otp_verify_user_refill_per_sec: float | None = None
+    # --- Login (password) IP rate limiting (audit D-10). Mechanism only, inert by default:
+    # shares the auth master switch otp_rate_limit_enabled / otp_rate_limit_enforce. NONE of
+    # these are approved policy numbers - leave unset until a measured limit is chosen.
+    login_ip_capacity: int | None = None
+    login_ip_refill_per_sec: float | None = None
     # F2 cumulative verification cap (DB-backed; independent of Redis).
     otp_verify_cap: int | None = None                  # max verifies per user per window
     otp_verify_cap_window_seconds: int = 900           # rolling window (>= 3x the 5-min TTL)
@@ -169,19 +174,20 @@ class Settings(BaseSettings):
         return v
 
     @field_validator("otp_request_ip_capacity", "otp_request_user_capacity",
-                     "otp_verify_ip_capacity", "otp_verify_user_capacity")
+                     "otp_verify_ip_capacity", "otp_verify_user_capacity", "login_ip_capacity")
     @classmethod
     def _otp_capacity_nonneg(cls, v):
         if v is not None and v < 0:
-            raise ValueError("OTP rate capacity must be >= 0 or null")
+            raise ValueError("auth rate capacity must be >= 0 or null")
         return v
 
     @field_validator("otp_request_ip_refill_per_sec", "otp_request_user_refill_per_sec",
-                     "otp_verify_ip_refill_per_sec", "otp_verify_user_refill_per_sec")
+                     "otp_verify_ip_refill_per_sec", "otp_verify_user_refill_per_sec",
+                     "login_ip_refill_per_sec")
     @classmethod
     def _otp_refill_nonneg(cls, v):
         if v is not None and v < 0:
-            raise ValueError("OTP rate refill must be >= 0 or null")
+            raise ValueError("auth rate refill must be >= 0 or null")
         return v
 
     @field_validator("otp_verify_cap")

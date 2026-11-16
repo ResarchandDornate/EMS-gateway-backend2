@@ -1,3 +1,4 @@
+import asyncio
 from datetime import datetime, timedelta, timezone
 
 import jwt
@@ -30,6 +31,19 @@ def verify_password(password: str, password_hash: str) -> bool:
         # wrong or malformed stored hash -> non-match. Unexpected (non-Argon2)
         # errors are NOT caught here; they propagate (generic 500, no internals leaked).
         return False
+
+
+# --- Async wrappers (audit finding D-10): Argon2id hash/verify is deliberately CPU-heavy
+# (~tens of ms). Called directly in an async handler it blocks the event loop, serialising
+# ingest/reads on the same worker and amplifying a login/token flood into a DoS. These run
+# the hash on a worker thread so the loop stays free. The sync versions are kept for tests
+# and non-async callers (model setup, seed scripts). Behaviour is otherwise identical.
+async def hash_password_async(password: str) -> str:
+    return await asyncio.to_thread(hash_password, password)
+
+
+async def verify_password_async(password: str, password_hash: str) -> bool:
+    return await asyncio.to_thread(verify_password, password, password_hash)
 
 
 def create_access_token(user_id) -> str:

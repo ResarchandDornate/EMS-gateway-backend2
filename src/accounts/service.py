@@ -2,7 +2,7 @@ from sqlalchemy import func, select
 from sqlalchemy.exc import IntegrityError
 import secrets
 
-from src.auth.security import hash_password
+from src.auth.security import hash_password_async
 from src.tenancy.gateways.models import GatewayModel
 
 from src.auth.models import AdminAuditModel, UserModel
@@ -297,13 +297,14 @@ async def register_gateway(session, actor, site, data):
 
     client_id = await _unique_client_id(session)         # UNCHANGED: server-generated
     client_secret = secrets.token_urlsafe(32)
+    client_secret_hash = await hash_password_async(client_secret)
 
     try:
         gateway = GatewayModel(
             site_id=site.id,
             gateway_key=data.gateway_key,
             client_id=client_id,
-            client_secret_hash=hash_password(client_secret),
+            client_secret_hash=client_secret_hash,
             software_version=data.software_version,
             enabled=True,
         )
