@@ -8,16 +8,20 @@ from src.signals.service import (
 
 # expected canonical counts verified against the workbooks
 S1_COUNT = 63
-S2_TOTAL = 2471
+S2_TOTAL = 2909  # Kalpa 2471 + CleanEdge v2.0: 72 meters/solar + 255 pcs + 111 io/liquid/dehum
 S2_BY_SUBSTREAM = {
     "ems_system": 45,
-    "pcs_extended": 86,
+    "pcs_extended": 341,  # 86 Kalpa + 255 CleanEdge v2.0 (Phase 5.9.2)
     "bms_extended": 2255,
-    "io_module": 17,
-    "liquid_cooling": 26,
+    "io_module": 70,          # 17 Kalpa + 53 CleanEdge
+    "liquid_cooling": 66,     # 26 Kalpa + 40 CleanEdge
     "fire_protection": 7,
-    "dehumidifier": 9,
+    "dehumidifier": 27,       # 9 Kalpa + 18 CleanEdge
     "remote_control": 26,
+    # CleanEdge v2.0 AVAILABLE_NOW meter/solar signals
+    "bess_aux_meter": 31,
+    "combiner_box_meter": 11,
+    "solar_inverter": 30,
 }
 
 
@@ -40,13 +44,14 @@ async def test_s2_substream_counts_match_kalpa(seeded):
     assert subs == S2_BY_SUBSTREAM
 
 
-async def test_s2_comes_only_from_kalpa(seeded):
+async def test_s2_sources_are_kalpa_or_cleanhedge(seeded):
     from sqlalchemy import select
     from src.signals.models import SignalRegistryModel
     rows = (await seeded.execute(
         select(SignalRegistryModel.source).where(SignalRegistryModel.primary_stream == "S2")
     )).scalars().all()
-    assert set(rows) == {"kalpa"}
+    # Kalpa base vocabulary plus the CleanEdge v2.0 meter/solar additions.
+    assert set(rows) == {"kalpa", "cleanhedge"}
 
 
 async def test_utility_meter_absent(seeded):

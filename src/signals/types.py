@@ -10,6 +10,7 @@ _INT_RANGE = {
     "U16": (0, 65535),
     "S16": (-32768, 32767),
     "U32": (0, 4294967295),
+    "S32": (-2147483648, 2147483647),
 }
 
 # Documented quality states: telemetry shows "good"; the S5-S6 delta defines

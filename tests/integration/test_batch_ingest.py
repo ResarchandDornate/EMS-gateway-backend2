@@ -288,17 +288,18 @@ async def test_S10_goes_to_charge_discharge_records(client, session, enabled):
 
 # ===================== exclusions & rejections (no data loss) =====================
 
-async def test_S2_combiner_box_meter_excluded(client, session, enabled):
+async def test_S2_combiner_box_meter_now_ingested(client, session, enabled):
+    # CleanEdge v2.0 maps combiner_box_meter (ABB MFM); it is no longer excluded and
+    # flows to Influx like any other S2 substream.
     c, _ = client
     app, stub = enabled
     org, site, gw = await _mk(session)
     r = await c.post(URL, json=_batch([_msg("general_asset_telemetry", "combiner_box_meter",
-                                            [_s2_rec()], message_id=uuid.uuid4())]), headers=_auth(gw))
+                                            [_s2_rec("frequency_hz", 50.0)], message_id=uuid.uuid4())]), headers=_auth(gw))
     assert r.status_code == 200, r.text
-    assert r.json()["accepted"] == []
-    rej = r.json()["rejected"][0]
-    assert rej["error_code"] == "substream_excluded" and rej["retryable"] is True
-    assert len(await _sr(session)) == 0 and len(await _fb(session)) == 0 and _points(stub) == []
+    assert {a["status"] for a in r.json()["accepted"]} == {"accepted"}
+    assert r.json()["rejected"] == []
+    assert len(_points(stub)) == 1 and len(await _sr(session)) == 0 and len(await _fb(session)) == 0
 
 
 async def test_unsupported_stream_retryable_reject(client, session, enabled):
