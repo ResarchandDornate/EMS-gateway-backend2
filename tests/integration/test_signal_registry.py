@@ -8,15 +8,15 @@ from src.signals.service import (
 
 # expected canonical counts verified against the workbooks
 S1_COUNT = 63
-S2_TOTAL = 2798  # 2471 Kalpa + 72 CleanEdge meters/solar + 255 CleanEdge pcs_extended
+S2_TOTAL = 3346  # Kalpa 2471 + CleanEdge: 72 meters/solar + 255 pcs + 111 io/liquid/dehum + 437 bms
 S2_BY_SUBSTREAM = {
     "ems_system": 45,
     "pcs_extended": 341,  # 86 Kalpa + 255 CleanEdge v2.0 (Phase 5.9.2)
-    "bms_extended": 2255,
-    "io_module": 17,
-    "liquid_cooling": 26,
+    "bms_extended": 2692,  # 2255 Kalpa + 437 CleanEdge v2.1 (Phase 5.10 BMS)
+    "io_module": 70,          # 17 Kalpa + 53 CleanEdge
+    "liquid_cooling": 66,     # 26 Kalpa + 40 CleanEdge
     "fire_protection": 7,
-    "dehumidifier": 9,
+    "dehumidifier": 27,       # 9 Kalpa + 18 CleanEdge
     "remote_control": 26,
     # CleanEdge v2.0 AVAILABLE_NOW meter/solar signals
     "bess_aux_meter": 31,
