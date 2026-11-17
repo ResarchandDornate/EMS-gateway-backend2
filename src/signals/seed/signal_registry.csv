@@ -1,67 +1,4 @@
 point_id,source,primary_stream,substream,asset_type,signal_key,display_name,unit,category,data_type,policy_mode,cadence_sec,deadband,policy_group,retention_class,event_eligible,rw,protocol_ref,source_ref
-p0097,ornate,S1,bess_fast,pcs_1,charge_discharge_power,Charge/Discharge Power,kW,power,Float,FAST_1S,1,,,T1_RAW_90D,false,0,192,Canonical Signal Matrix:row101
-p0112,ornate,S1,bess_fast,pcs_1,soc,SOC,%,soc_soh,Float,FAST_1S,1,,,T1_RAW_90D,false,0,222,Canonical Signal Matrix:row116
-p0117,ornate,S1,bess_fast,pcs_1,fault_status,Fault Status,,fault_alarm,Float,FAST_1S,1,,,T1_RAW_90D,true,0,232,Canonical Signal Matrix:row121
-p0118,ornate,S1,bess_fast,pcs_1,on_grid_status,On-Grid Status,,status,Float,FAST_1S,1,,,T1_RAW_90D,false,0,234,Canonical Signal Matrix:row122
-p0119,ornate,S1,bess_fast,pcs_1,off_grid_status,Off-Grid Status,,status,Float,FAST_1S,1,,,T1_RAW_90D,false,0,236,Canonical Signal Matrix:row123
-p0133,ornate,S1,bess_fast,pcs_1,total_fault_status,Total Fault Status,,fault_alarm,Float,FAST_1S,1,,,T1_RAW_90D,true,0,264,Canonical Signal Matrix:row137
-p0136,ornate,S1,bess_fast,pcs_1,bms_online_status,BMS Online Status,,status,Float,FAST_1S,1,,,T1_RAW_90D,true,0,270,Canonical Signal Matrix:row140
-p0137,ornate,S1,bess_fast,pcs_1,pcs_online_status,PCS Online Status,,status,Float,FAST_1S,1,,,T1_RAW_90D,true,0,272,Canonical Signal Matrix:row141
-p0165,ornate,S1,bess_fast,pcs_1,running_status_2,Running Status,,status,Float,FAST_1S,1,,,T1_RAW_90D,false,0,328,Canonical Signal Matrix:row169
-p0167,ornate,S1,bess_fast,pcs_1,total_alarm_status,Total Alarm Status,,fault_alarm,Float,FAST_1S,1,,,T1_RAW_90D,true,0,332,Canonical Signal Matrix:row171
-p0174,ornate,S1,bess_fast,pcs_1,phase_a_voltage,Phase A Voltage,V,voltage,Float,FAST_1S,1,,,T1_RAW_90D,false,0,346,Canonical Signal Matrix:row178
-p0175,ornate,S1,bess_fast,pcs_1,phase_b_voltage,Phase B Voltage,V,voltage,Float,FAST_1S,1,,,T1_RAW_90D,false,0,348,Canonical Signal Matrix:row179
-p0176,ornate,S1,bess_fast,pcs_1,phase_c_voltage,Phase C Voltage,V,voltage,Float,FAST_1S,1,,,T1_RAW_90D,false,0,350,Canonical Signal Matrix:row180
-p0177,ornate,S1,bess_fast,pcs_1,phase_a_current,Phase A Current,A,current,Float,FAST_1S,1,,,T1_RAW_90D,false,0,352,Canonical Signal Matrix:row181
-p0178,ornate,S1,bess_fast,pcs_1,phase_b_current,Phase B Current,A,current,Float,FAST_1S,1,,,T1_RAW_90D,false,0,354,Canonical Signal Matrix:row182
-p0179,ornate,S1,bess_fast,pcs_1,phase_c_current,Phase C Current,A,current,Float,FAST_1S,1,,,T1_RAW_90D,false,0,356,Canonical Signal Matrix:row183
-p0180,ornate,S1,bess_fast,pcs_1,grid_frequency,Grid Frequency,Hz,general,Float,FAST_1S,1,,,T1_RAW_90D,false,0,358,Canonical Signal Matrix:row184
-p0184,ornate,S1,bess_fast,pcs_1,total_active_power,Total Active Power,kW,power,Float,FAST_1S,1,,,T1_RAW_90D,false,0,366,Canonical Signal Matrix:row188
-p0198,ornate,S1,bess_fast,pcs_1,dc_voltage,DC Voltage,V,voltage,Float,FAST_1S,1,,,T1_RAW_90D,false,0,394,Canonical Signal Matrix:row202
-p0199,ornate,S1,bess_fast,pcs_1,dc_current,DC Current,A,current,Float,FAST_1S,1,,,T1_RAW_90D,false,0,396,Canonical Signal Matrix:row203
-p0297,ornate,S1,bess_fast,pcs_1,sw_fault_ac_over_voltage,SW Fault-AC Over-Voltage,,fault_alarm,Float,FAST_1S,1,,,T1_RAW_90D,true,0,592,Canonical Signal Matrix:row301
-p0298,ornate,S1,bess_fast,pcs_1,sw_fault_ac_under_voltage,SW Fault-AC Under-Voltage,,fault_alarm,Float,FAST_1S,1,,,T1_RAW_90D,true,0,594,Canonical Signal Matrix:row302
-p0307,ornate,S1,bess_fast,pcs_1,sw_fault_ac_over_frequency,SW Fault-AC Over-Frequency,,fault_alarm,Float,FAST_1S,1,,,T1_RAW_90D,true,0,612,Canonical Signal Matrix:row311
-p0308,ornate,S1,bess_fast,pcs_1,sw_fault_ac_under_frequency,SW Fault-AC Under-Frequency,,fault_alarm,Float,FAST_1S,1,,,T1_RAW_90D,true,0,614,Canonical Signal Matrix:row312
-p0309,ornate,S1,bess_fast,pcs_1,sw_fault_dc_charge_over_current,SW Fault-DC Charge Over-Current,,fault_alarm,Float,FAST_1S,1,,,T1_RAW_90D,true,0,616,Canonical Signal Matrix:row313
-p0310,ornate,S1,bess_fast,pcs_1,sw_fault_dc_discharge_over_current,SW Fault-DC Discharge Over-Current,,fault_alarm,Float,FAST_1S,1,,,T1_RAW_90D,true,0,618,Canonical Signal Matrix:row314
-p0344,ornate,S1,bess_fast,pcs_1,hw_fault_ac_over_current,HW Fault-AC Over-Current,,fault_alarm,Float,FAST_1S,1,,,T1_RAW_90D,true,0,686,Canonical Signal Matrix:row348
-p0345,ornate,S1,bess_fast,pcs_1,sw_fault_ac_over_current,SW Fault-AC Over-Current,,fault_alarm,Float,FAST_1S,1,,,T1_RAW_90D,true,0,688,Canonical Signal Matrix:row349
-p0372,ornate,S1,bess_fast,bms_1,insulation_fault,Insulation Fault,,fault_alarm,Float,FAST_1S,1,,,T1_RAW_90D,true,0,742,Canonical Signal Matrix:row376
-p0375,ornate,S1,bess_fast,bms_1,battery_temperature_sensor_fault,Battery Temperature Sensor Fault,,fault_alarm,Float,FAST_1S,1,,,T1_RAW_90D,true,0,748,Canonical Signal Matrix:row379
-p0376,ornate,S1,bess_fast,bms_1,voltage_sampling_fault,Voltage Sampling Fault,,fault_alarm,Float,FAST_1S,1,,,T1_RAW_90D,true,0,750,Canonical Signal Matrix:row380
-p0378,ornate,S1,bess_fast,bms_1,current_sampling_fault_functional_safety_fault,Current Sampling Fault (Functional Safety Fault),,fault_alarm,Float,FAST_1S,1,,,T1_RAW_90D,true,0,754,Canonical Signal Matrix:row382
-p0380,ornate,S1,bess_fast,bms_1,charge_over_current,Charge Over-Current,,fault_alarm,Float,FAST_1S,1,,,T1_RAW_90D,true,0,758,Canonical Signal Matrix:row384
-p0383,ornate,S1,bess_fast,bms_1,fuse_fault,Fuse Fault,,fault_alarm,Float,FAST_1S,1,,,T1_RAW_90D,true,0,764,Canonical Signal Matrix:row387
-p0384,ornate,S1,bess_fast,bms_1,contactor_fault,Contactor Fault,,fault_alarm,Float,FAST_1S,1,,,T1_RAW_90D,true,0,766,Canonical Signal Matrix:row388
-p0385,ornate,S1,bess_fast,bms_1,bmu_communication_fault,BMU Communication Fault,,fault_alarm,Float,FAST_1S,1,,,T1_RAW_90D,true,0,768,Canonical Signal Matrix:row389
-p0386,ornate,S1,bess_fast,bms_1,bau_communication_fault,BAU Communication Fault,,fault_alarm,Float,FAST_1S,1,,,T1_RAW_90D,true,0,770,Canonical Signal Matrix:row390
-p0388,ornate,S1,bess_fast,bms_1,insulation_monitoring_fault,Insulation Monitoring Fault,,fault_alarm,Float,FAST_1S,1,,,T1_RAW_90D,true,0,774,Canonical Signal Matrix:row392
-p0394,ornate,S1,bess_fast,bms_1,pcs_communication_fault,PCS Communication Fault,,fault_alarm,Float,FAST_1S,1,,,T1_RAW_90D,true,0,786,Canonical Signal Matrix:row398
-p0397,ornate,S1,bess_fast,bms_1,cell_over_voltage_level_1,Cell Over-Voltage (Level 1),,fault_alarm,Float,FAST_1S,1,,,T1_RAW_90D,true,0,792,Canonical Signal Matrix:row401
-p0398,ornate,S1,bess_fast,bms_1,cell_under_voltage_level_1,Cell Under-Voltage (Level 1),,fault_alarm,Float,FAST_1S,1,,,T1_RAW_90D,true,0,794,Canonical Signal Matrix:row402
-p0399,ornate,S1,bess_fast,bms_1,discharge_over_current_level_1,Discharge Over-Current (Level 1),,fault_alarm,Float,FAST_1S,1,,,T1_RAW_90D,true,0,796,Canonical Signal Matrix:row403
-p0457,ornate,S1,bess_fast,bms_1,system_status,System Status,,status,Float,FAST_1S,1,,,T1_RAW_90D,false,0,912,Canonical Signal Matrix:row461
-p0461,ornate,S1,bess_fast,bms_1,charge_discharge_status,Charge/Discharge Status,,io,Float,FAST_1S,1,,,T1_RAW_90D,false,0,920,Canonical Signal Matrix:row465
-p0464,ornate,S1,bess_fast,bms_1,pre_charge_contactor_status,Pre-Charge Contactor Status,,status,Float,FAST_1S,1,,,T1_RAW_90D,false,0,926,Canonical Signal Matrix:row468
-p0465,ornate,S1,bess_fast,bms_1,negative_contactor_status,Negative Contactor Status,,status,Float,FAST_1S,1,,,T1_RAW_90D,false,0,928,Canonical Signal Matrix:row469
-p1014,ornate,S1,bess_fast,bms_1,cell_max_voltage,Cell Max Voltage,mV,voltage,Float,FAST_1S,1,,,T1_RAW_90D,false,0,2026,Canonical Signal Matrix:row1018
-p1018,ornate,S1,bess_fast,bms_1,cell_min_voltage,Cell Min Voltage,mV,voltage,Float,FAST_1S,1,,,T1_RAW_90D,false,0,2034,Canonical Signal Matrix:row1022
-p1022,ornate,S1,bess_fast,bms_1,max_min_cell_voltage_diff,Max-Min Cell Voltage Diff,mV,voltage,Float,FAST_1S,1,,,T1_RAW_90D,false,0,2042,Canonical Signal Matrix:row1026
-p1024,ornate,S1,bess_fast,bms_1,battery_max_temperature,Battery Max Temperature,℃,temperature,Float,FAST_1S,1,,,T1_RAW_90D,false,0,2046,Canonical Signal Matrix:row1028
-p1028,ornate,S1,bess_fast,bms_1,battery_min_temperature,Battery Min Temperature,℃,temperature,Float,FAST_1S,1,,,T1_RAW_90D,false,0,2054,Canonical Signal Matrix:row1032
-p1032,ornate,S1,bess_fast,bms_1,average_temperature,Average Temperature,℃,temperature,Float,FAST_1S,1,,,T1_RAW_90D,false,0,2062,Canonical Signal Matrix:row1036
-p1037,ornate,S1,bess_fast,bms_1,display_soc,Display SOC,%,soc_soh,Float,FAST_1S,1,,,T1_RAW_90D,false,0,2072,Canonical Signal Matrix:row1041
-p1038,ornate,S1,bess_fast,bms_1,soh,SOH,%,soc_soh,Float,FAST_1S,1,,,T1_RAW_90D,false,0,2074,Canonical Signal Matrix:row1042
-p1045,ornate,S1,bess_fast,bms_1,pre_charge_total_voltage,Pre-Charge Total Voltage,V,voltage,Float,FAST_1S,1,,,T1_RAW_90D,false,0,2088,Canonical Signal Matrix:row1049
-p1047,ornate,S1,bess_fast,bms_1,cluster_total_voltage_collected,Cluster Total Voltage (Collected),V,voltage,Float,FAST_1S,1,,,T1_RAW_90D,false,0,2092,Canonical Signal Matrix:row1051
-p1048,ornate,S1,bess_fast,bms_1,cluster_total_current,Cluster Total Current,A,current,Float,FAST_1S,1,,,T1_RAW_90D,false,0,2094,Canonical Signal Matrix:row1052
-p1051,ornate,S1,bess_fast,bms_1,can_hall_sampling_current,CAN Hall Sampling Current,A,current,Float,FAST_1S,1,,,T1_RAW_90D,false,0,2100,Canonical Signal Matrix:row1055
-p1053,ornate,S1,bess_fast,bms_1,insulation_resistance,Insulation Resistance,kΩ,insulation,Float,FAST_1S,1,,,T1_RAW_90D,false,0,2104,Canonical Signal Matrix:row1057
-p1077,ornate,S1,bess_fast,bms_1,battery_pack_over_voltage_alarm_voltage_value,Battery Pack Over-Voltage Alarm Voltage Value,V,fault_alarm,Float,FAST_1S,1,,,T1_RAW_90D,false,0,2152,Canonical Signal Matrix:row1081
-p1079,ornate,S1,bess_fast,bms_1,battery_pack_under_voltage_alarm_voltage_value,Battery Pack Under-Voltage Alarm Voltage Value,V,fault_alarm,Float,FAST_1S,1,,,T1_RAW_90D,false,0,2156,Canonical Signal Matrix:row1083
-p1081,ornate,S1,bess_fast,bms_1,battery_charge_over_current_alarm_current_value,Battery Charge Over-Current Alarm Current Value,A,fault_alarm,Float,FAST_1S,1,,,T1_RAW_90D,false,0,2160,Canonical Signal Matrix:row1085
-p1083,ornate,S1,bess_fast,bms_1,battery_discharge_over_current_alarm_current_value,Battery Discharge Over-Current Alarm Current Value,A,fault_alarm,Float,FAST_1S,1,,,T1_RAW_90D,false,0,2164,Canonical Signal Matrix:row1087
 ,kalpa,S2,ems_system,bank,battery_system_state,Battery system state/Container state,,system_data,U16,ON_CHANGE_HEARTBEAT,120,,BMS_SYSTEM_STATUS,T2_1Y,true,R,bank.system_data.battery_system_state,DATA S2.1 EMS System:row10
 ,kalpa,S2,ems_system,bank,operating_rack_count,Operate battery racks no./ How many racks are operating,,system_data,U16,ON_CHANGE_HEARTBEAT,1800,,BMS_SYSTEM_STATIC,T2_1Y,true,R,bank.system_data.operating_rack_count,DATA S2.1 EMS System:row11
 ,kalpa,S2,ems_system,bank,operating_rack_bitmap,"Flag of operate racks/ Rack position, which rack are operating or not",,system_data,U16,ON_CHANGE_HEARTBEAT,1800,,BMS_SYSTEM_STATIC,T2_1Y,true,R,bank.system_data.operating_rack_bitmap,DATA S2.1 EMS System:row12
@@ -3408,3 +3345,58 @@ p1083,ornate,S1,bess_fast,bms_1,battery_discharge_over_current_alarm_current_val
 ,cleanhedge,S2,bms_extended,rack,dsg_cell_temp_tip_recovery,Dsg Cell Temp Diff Notify Recovery,℃,bms,S16,ON_CHANGE_HEARTBEAT,86400,,PROTECTION_THRESHOLD,T2_1Y,false,r,telemetry.rack.dsg_cell_temp_tip_recovery,DATA S2.3 BMS Extended:row2704
 ,cleanhedge,S2,bms_extended,rack,dsg_module_volt_tip_recovery,Dsg Module Volt Diff Notify Recovery,V,bms,S16,ON_CHANGE_HEARTBEAT,86400,,PROTECTION_THRESHOLD,T2_1Y,false,r,telemetry.rack.dsg_module_volt_tip_recovery,DATA S2.3 BMS Extended:row2705
 ,cleanhedge,S2,bms_extended,rack,pack_temp_diff_tip_recovery,Pack Temp Diff Notify Recovery,℃,bms,S16,ON_CHANGE_HEARTBEAT,86400,,PROTECTION_THRESHOLD,T2_1Y,false,r,telemetry.rack.pack_temp_diff_tip_recovery,DATA S2.3 BMS Extended:row2706
+,cleanhedge,S1,bess_fast,pcs,running,Running,,pcs,U16,PERIODIC,1,,S1_FAST,T1_RAW_90D,false,r,pcs_values.running,DATA CH S1 SOURCE MAP:row5
+,cleanhedge,S1,bess_fast,pcs,charging,Charging,,pcs,U16,PERIODIC,1,,S1_FAST,T1_RAW_90D,false,r,pcs_values.charging,DATA CH S1 SOURCE MAP:row6
+,cleanhedge,S1,bess_fast,pcs,discharging,Discharging,,pcs,U16,PERIODIC,1,,S1_FAST,T1_RAW_90D,false,r,pcs_values.discharging,DATA CH S1 SOURCE MAP:row7
+,cleanhedge,S1,bess_fast,pcs,faulted,Faulted,,pcs,U16,PERIODIC,1,,S1_FAST,T1_RAW_90D,false,r,pcs_values.faulted,DATA CH S1 SOURCE MAP:row8
+,cleanhedge,S1,bess_fast,pcs,standby,Standby,,pcs,U16,PERIODIC,1,,S1_FAST,T1_RAW_90D,false,r,pcs_values.standby,DATA CH S1 SOURCE MAP:row9
+,cleanhedge,S1,bess_fast,pcs,shutdown,Shutdown,,pcs,U16,PERIODIC,1,,S1_FAST,T1_RAW_90D,false,r,pcs_values.shutdown,DATA CH S1 SOURCE MAP:row10
+,cleanhedge,S1,bess_fast,pcs,epo,Epo,,pcs,U16,PERIODIC,1,,S1_FAST,T1_RAW_90D,false,r,pcs_values.epo,DATA CH S1 SOURCE MAP:row11
+,cleanhedge,S1,bess_fast,pcs,off_grid,Off Grid,,pcs,U16,PERIODIC,1,,S1_FAST,T1_RAW_90D,false,r,pcs_values.off_grid,DATA CH S1 SOURCE MAP:row12
+,cleanhedge,S1,bess_fast,pcs,dc_precharge_connected,Dc Precharge Connected,,pcs,U16,PERIODIC,1,,S1_FAST,T1_RAW_90D,false,r,pcs_values.dc_precharge_connected,DATA CH S1 SOURCE MAP:row13
+,cleanhedge,S1,bess_fast,pcs,dc_relay_connected,Dc Relay Connected,,pcs,U16,PERIODIC,1,,S1_FAST,T1_RAW_90D,false,r,pcs_values.dc_relay_connected,DATA CH S1 SOURCE MAP:row14
+,cleanhedge,S1,bess_fast,pcs,ac_relay_connected,Ac Relay Connected,,pcs,U16,PERIODIC,1,,S1_FAST,T1_RAW_90D,false,r,pcs_values.ac_relay_connected,DATA CH S1 SOURCE MAP:row15
+,cleanhedge,S1,bess_fast,pcs,active_power_kw,Active Power Kw,kW,pcs,FLOAT32,PERIODIC,1,,S1_FAST,T1_RAW_90D,false,r,pcs_values.active_power_kw,DATA CH S1 SOURCE MAP:row16
+,cleanhedge,S1,bess_fast,pcs,reactive_power_kvar,Reactive Power Kvar,kVar,pcs,FLOAT32,PERIODIC,1,,S1_FAST,T1_RAW_90D,false,r,pcs_values.reactive_power_kvar,DATA CH S1 SOURCE MAP:row17
+,cleanhedge,S1,bess_fast,pcs,power_factor,Power Factor,,pcs,FLOAT32,PERIODIC,1,,S1_FAST,T1_RAW_90D,false,r,pcs_values.power_factor,DATA CH S1 SOURCE MAP:row18
+,cleanhedge,S1,bess_fast,pcs,dc_voltage_v,Dc Voltage V,V,pcs,FLOAT32,PERIODIC,1,,S1_FAST,T1_RAW_90D,false,r,pcs_values.dc_voltage_v,DATA CH S1 SOURCE MAP:row19
+,cleanhedge,S1,bess_fast,pcs,dc_current_a,Dc Current A,A,pcs,FLOAT32,PERIODIC,1,,S1_FAST,T1_RAW_90D,false,r,pcs_values.dc_current_a,DATA CH S1 SOURCE MAP:row20
+,cleanhedge,S1,bess_fast,pcs,dc_power_kw,Dc Power Kw,kW,pcs,FLOAT32,PERIODIC,1,,S1_FAST,T1_RAW_90D,false,r,pcs_values.dc_power_kw,DATA CH S1 SOURCE MAP:row21
+,cleanhedge,S1,bess_fast,pcs,dc_bus_voltage_v,Dc Bus Voltage V,V,pcs,FLOAT32,PERIODIC,1,,S1_FAST,T1_RAW_90D,false,r,pcs_values.dc_bus_voltage_v,DATA CH S1 SOURCE MAP:row22
+,cleanhedge,S1,bess_fast,pcs,grid_frequency_hz,Grid Frequency Hz,Hz,pcs,FLOAT32,PERIODIC,1,,S1_FAST,T1_RAW_90D,false,r,pcs_values.grid_frequency_hz,DATA CH S1 SOURCE MAP:row23
+,cleanhedge,S1,bess_fast,pcs,grid_voltage_ab_v,Grid Voltage Ab V,V,pcs,FLOAT32,PERIODIC,1,,S1_FAST,T1_RAW_90D,false,r,pcs_values.grid_voltage_ab_v,DATA CH S1 SOURCE MAP:row24
+,cleanhedge,S1,bess_fast,pcs,grid_voltage_bc_v,Grid Voltage Bc V,V,pcs,FLOAT32,PERIODIC,1,,S1_FAST,T1_RAW_90D,false,r,pcs_values.grid_voltage_bc_v,DATA CH S1 SOURCE MAP:row25
+,cleanhedge,S1,bess_fast,pcs,grid_voltage_ca_v,Grid Voltage Ca V,V,pcs,FLOAT32,PERIODIC,1,,S1_FAST,T1_RAW_90D,false,r,pcs_values.grid_voltage_ca_v,DATA CH S1 SOURCE MAP:row26
+,cleanhedge,S1,bess_fast,pcs,raw_status,Raw Status,,pcs,U32,PERIODIC,1,,S1_FAST,T1_RAW_90D,false,r,pcs_values.raw_status,DATA CH S1 SOURCE MAP:row27
+,cleanhedge,S1,bess_fast,bank,state,State,,bms,Float,PERIODIC,1,,S1_FAST,T1_RAW_90D,false,r,bms_values.state,DATA CH S1 SOURCE MAP:row28
+,cleanhedge,S1,bess_fast,bank,state_code,State Code,,bms,U32,PERIODIC,1,,S1_FAST,T1_RAW_90D,false,r,bms_values.state_code,DATA CH S1 SOURCE MAP:row29
+,cleanhedge,S1,bess_fast,bank,voltage_v,Voltage V,V,bms,FLOAT32,PERIODIC,1,,S1_FAST,T1_RAW_90D,false,r,bms_values.voltage_v,DATA CH S1 SOURCE MAP:row30
+,cleanhedge,S1,bess_fast,bank,current_a,Current A,A,bms,FLOAT32,PERIODIC,1,,S1_FAST,T1_RAW_90D,false,r,bms_values.current_a,DATA CH S1 SOURCE MAP:row31
+,cleanhedge,S1,bess_fast,bank,soc_percent,Soc Percent,%,bms,FLOAT32,PERIODIC,1,,S1_FAST,T1_RAW_90D,false,r,bms_values.soc_percent,DATA CH S1 SOURCE MAP:row32
+,cleanhedge,S1,bess_fast,bank,soh_percent,Soh Percent,%,bms,FLOAT32,PERIODIC,1,,S1_FAST,T1_RAW_90D,false,r,bms_values.soh_percent,DATA CH S1 SOURCE MAP:row33
+,cleanhedge,S1,bess_fast,bank,max_charge_power_kw,Max Charge Power Kw,kW,bms,FLOAT32,PERIODIC,1,,S1_FAST,T1_RAW_90D,false,r,bms_values.max_charge_power_kw,DATA CH S1 SOURCE MAP:row34
+,cleanhedge,S1,bess_fast,bank,max_discharge_power_kw,Max Discharge Power Kw,kW,bms,FLOAT32,PERIODIC,1,,S1_FAST,T1_RAW_90D,false,r,bms_values.max_discharge_power_kw,DATA CH S1 SOURCE MAP:row35
+,cleanhedge,S1,bess_fast,bank,max_charge_current_a,Max Charge Current A,A,bms,FLOAT32,PERIODIC,1,,S1_FAST,T1_RAW_90D,false,r,bms_values.max_charge_current_a,DATA CH S1 SOURCE MAP:row36
+,cleanhedge,S1,bess_fast,bank,max_discharge_current_a,Max Discharge Current A,A,bms,FLOAT32,PERIODIC,1,,S1_FAST,T1_RAW_90D,false,r,bms_values.max_discharge_current_a,DATA CH S1 SOURCE MAP:row37
+,cleanhedge,S1,bess_fast,bank,positive_contactor_closed,Positive Contactor Closed,,bms,U16,PERIODIC,1,,S1_FAST,T1_RAW_90D,false,r,bms_values.positive_contactor_closed,DATA CH S1 SOURCE MAP:row38
+,cleanhedge,S1,bess_fast,bank,negative_contactor_closed,Negative Contactor Closed,,bms,U16,PERIODIC,1,,S1_FAST,T1_RAW_90D,false,r,bms_values.negative_contactor_closed,DATA CH S1 SOURCE MAP:row39
+,cleanhedge,S1,bess_fast,bank,positive_insulation_mohm,Positive Insulation Mohm,MOhm,bms,FLOAT32,PERIODIC,1,,S1_FAST,T1_RAW_90D,false,r,bms_values.positive_insulation_mohm,DATA CH S1 SOURCE MAP:row40
+,cleanhedge,S1,bess_fast,bank,negative_insulation_mohm,Negative Insulation Mohm,MOhm,bms,FLOAT32,PERIODIC,1,,S1_FAST,T1_RAW_90D,false,r,bms_values.negative_insulation_mohm,DATA CH S1 SOURCE MAP:row41
+,cleanhedge,S1,bess_fast,bank,max_cell_voltage_v,Max Cell Voltage V,V,bms,FLOAT32,PERIODIC,1,,S1_FAST,T1_RAW_90D,false,r,bms_values.max_cell_voltage_v,DATA CH S1 SOURCE MAP:row42
+,cleanhedge,S1,bess_fast,bank,min_cell_voltage_v,Min Cell Voltage V,V,bms,FLOAT32,PERIODIC,1,,S1_FAST,T1_RAW_90D,false,r,bms_values.min_cell_voltage_v,DATA CH S1 SOURCE MAP:row43
+,cleanhedge,S1,bess_fast,bank,max_cell_temperature_c,Max Cell Temperature C,degC,bms,FLOAT32,PERIODIC,1,,S1_FAST,T1_RAW_90D,false,r,bms_values.max_cell_temperature_c,DATA CH S1 SOURCE MAP:row44
+,cleanhedge,S1,bess_fast,bank,min_cell_temperature_c,Min Cell Temperature C,degC,bms,FLOAT32,PERIODIC,1,,S1_FAST,T1_RAW_90D,false,r,bms_values.min_cell_temperature_c,DATA CH S1 SOURCE MAP:row45
+,cleanhedge,S1,bess_fast,bank,charge_allowed,Charge Allowed,,bms,U16,PERIODIC,1,,S1_FAST,T1_RAW_90D,false,r,bms_values.charge_allowed,DATA CH S1 SOURCE MAP:row46
+,cleanhedge,S1,bess_fast,bank,discharge_allowed,Discharge Allowed,,bms,U16,PERIODIC,1,,S1_FAST,T1_RAW_90D,false,r,bms_values.discharge_allowed,DATA CH S1 SOURCE MAP:row47
+,cleanhedge,S1,bess_fast,bank,blocking_reasons,Blocking Reasons,,bms,Float,PERIODIC,1,,S1_FAST,T1_RAW_90D,false,r,bms_values.blocking_reasons,DATA CH S1 SOURCE MAP:row48
+,cleanhedge,S1,bess_fast,pcs,derated,Derated,,pcs,U16,PERIODIC,1,,S1_FAST,T1_RAW_90D,false,r,pcs_values.derated,DATA CH S1 SOURCE MAP:row49
+,cleanhedge,S1,bess_fast,pcs,remote_control_mode,Remote Control Mode,,pcs,U16,PERIODIC,1,,S1_FAST,T1_RAW_90D,false,r,pcs_values.remote_control_mode,DATA CH S1 SOURCE MAP:row50
+,cleanhedge,S1,bess_fast,pcs,remote_shutdown_active,Remote Shutdown Active,,pcs,U16,PERIODIC,1,,S1_FAST,T1_RAW_90D,false,r,pcs_values.remote_shutdown_active,DATA CH S1 SOURCE MAP:row51
+,cleanhedge,S1,bess_fast,bank,chg_dsg_state,Chg Dsg State,,bms,Float,PERIODIC,1,,S1_FAST,T1_RAW_90D,false,r,bms_values.chg_dsg_state,DATA CH S1 SOURCE MAP:row52
+,cleanhedge,S1,bess_fast,bank,charge_prohibited,Charge Prohibited,,bms,U16,PERIODIC,1,,S1_FAST,T1_RAW_90D,false,r,bms_values.charge_prohibited,DATA CH S1 SOURCE MAP:row53
+,cleanhedge,S1,bess_fast,bank,discharge_prohibited,Discharge Prohibited,,bms,U16,PERIODIC,1,,S1_FAST,T1_RAW_90D,false,r,bms_values.discharge_prohibited,DATA CH S1 SOURCE MAP:row54
+,cleanhedge,S1,bess_fast,bank,system_alarm_active,System Alarm Active,,bms,U16,PERIODIC,1,,S1_FAST,T1_RAW_90D,false,r,bms_values.system_alarm_active,DATA CH S1 SOURCE MAP:row55
+,cleanhedge,S1,bess_fast,bank,system_warning_active,System Warning Active,,bms,U16,PERIODIC,1,,S1_FAST,T1_RAW_90D,false,r,bms_values.system_warning_active,DATA CH S1 SOURCE MAP:row56
+,cleanhedge,S1,bess_fast,bank,critical_alarm_active,Critical Alarm Active,,bms,U16,PERIODIC,1,,S1_FAST,T1_RAW_90D,false,r,bms_values.critical_alarm_active,DATA CH S1 SOURCE MAP:row57
+,cleanhedge,S1,bess_fast,bank,precharge_contactor_closed,Precharge Contactor Closed,,bms,U16,PERIODIC,1,,S1_FAST,T1_RAW_90D,false,r,bms_values.precharge_contactor_closed,DATA CH S1 SOURCE MAP:row58
+,cleanhedge,S1,bess_fast,bank,bau_soc_percent,Bau Soc Percent,%,bms,FLOAT32,PERIODIC,1,,S1_FAST,T1_RAW_90D,false,r,bms_values.bau_soc_percent,DATA CH S1 SOURCE MAP:row59

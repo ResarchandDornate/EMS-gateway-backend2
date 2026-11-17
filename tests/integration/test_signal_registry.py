@@ -7,7 +7,7 @@ from src.signals.service import (
 )
 
 # expected canonical counts verified against the workbooks
-S1_COUNT = 63
+S1_COUNT = 55  # CleanEdge v2.1 Phase 6.1: legacy 63 ornate S1 replaced by 55 normalized fields
 S2_TOTAL = 3346  # Kalpa 2471 + CleanEdge: 72 meters/solar + 255 pcs + 111 io/liquid/dehum + 437 bms
 S2_BY_SUBSTREAM = {
     "ems_system": 45,
