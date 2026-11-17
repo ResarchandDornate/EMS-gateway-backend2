@@ -3441,3 +3441,7 @@ point_id,source,primary_stream,substream,asset_type,signal_key,display_name,unit
 ,cleanhedge,S2,ems_system,bank,year_echg_cum,Year Echg Cum,,measure,U32,PERIODIC,60,,fast,T2_1Y,false,r,bank.measure.year_echg_cum,DATA S2.1 EMS System:row99
 ,cleanhedge,S2,ems_system,bank,year_edsg_cum,Year Edsg Cum,,measure,U32,PERIODIC,60,,fast,T2_1Y,false,r,bank.measure.year_edsg_cum,DATA S2.1 EMS System:row100
 ,cleanhedge,S2,ems_system,bank,system_soc,system_soc,%,system_data,FLOAT32,PERIODIC,60,,PLANT_ANALOG,T2_1Y,false,r,bank.system_data.system_soc,DATA S2.1 EMS System:row60
+,cleanhedge,S2,pcs_extended,pcs,cumulative_charge_energy_kwh,Cumulative charge energy (AC  module),kWh,pcs,U32,PERIODIC,300,,ENERGY_COUNTER,T3_3Y,false,r,telemetry.pcs.cumulative_charge_energy_kwh,DATA S2.2 PCS Extended:row360
+,cleanhedge,S2,pcs_extended,pcs,cumulative_discharge_energy_kwh,Cumulative discharge energy (AC  module),kWh,pcs,U32,PERIODIC,300,,ENERGY_COUNTER,T3_3Y,false,r,telemetry.pcs.cumulative_discharge_energy_kwh,DATA S2.2 PCS Extended:row361
+,cleanhedge,S2,ems_system,bank,system_today_charge_energy,System Charge Energy Today,kWh,system_data,FLOAT32,PERIODIC,300,,PLANT_ENERGY,T3_3Y,false,r,bank.system_data.system_today_charge_energy,DATA S2.1 EMS System:row101
+,cleanhedge,S2,ems_system,bank,system_today_discharge_energy,System Discharge Energy Today,kWh,system_data,FLOAT32,PERIODIC,300,,PLANT_ENERGY,T3_3Y,false,r,bank.system_data.system_today_discharge_energy,DATA S2.1 EMS System:row102

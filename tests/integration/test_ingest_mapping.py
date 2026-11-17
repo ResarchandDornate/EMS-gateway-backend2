@@ -205,7 +205,7 @@ def test_real_seed_builds_and_routes():
     # Regression tripwire on the documented per-stream totals (one source of truth).
     s1_rows = sum(1 for ps, *_ in rows if ps == "S1")
     s2_rows = sum(1 for ps, *_ in rows if ps == "S2")
-    assert (s1_rows, s2_rows) == (55, 3387)  # S1 CleanEdge v2.1; S2 incl. Phase 5.11 EMS System (+41)
+    assert (s1_rows, s2_rows) == (55, 3391)  # S1 CleanEdge v2.1; S2 incl. Phase 5.11 (+41) + 5.13 (+4)
     # S1 -> raw, S2 T2 -> long, real T3 -> 3y
     from src.ingestion.mapping import build_message_points
     id2 = {"organization_id": "org1", "site_id": "site1", "gateway_id": "gw1"}

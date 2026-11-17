@@ -8,10 +8,10 @@ from src.signals.service import (
 
 # expected canonical counts verified against the workbooks
 S1_COUNT = 55  # CleanEdge v2.1 Phase 6.1: legacy 63 ornate S1 replaced by 55 normalized fields
-S2_TOTAL = 3387  # 3346 + Phase 5.11 EMS System: 40 BAU bank.measure + 1 plant system_soc
+S2_TOTAL = 3391  # 3387 + Phase 5.13 energy counters: 2 PCS cumulative kWh + 2 plant daily kWh
 S2_BY_SUBSTREAM = {
-    "ems_system": 86,  # 45 Kalpa + 41 CleanEdge v2.1 (Phase 5.11: 40 BAU + system_soc)
-    "pcs_extended": 341,  # 86 Kalpa + 255 CleanEdge v2.0 (Phase 5.9.2)
+    "ems_system": 88,  # 45 Kalpa + 43 CleanEdge (Phase 5.11: 41; Phase 5.13: +2 plant daily energy)
+    "pcs_extended": 343,  # 86 Kalpa + 257 CleanEdge (Phase 5.9.2: 255; Phase 5.13: +2 PCS cumulative energy)
     "bms_extended": 2692,  # 2255 Kalpa + 437 CleanEdge v2.1 (Phase 5.10 BMS)
     "io_module": 70,          # 17 Kalpa + 53 CleanEdge
     "liquid_cooling": 66,     # 26 Kalpa + 40 CleanEdge
