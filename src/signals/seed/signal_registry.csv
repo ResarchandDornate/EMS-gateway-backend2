@@ -3400,3 +3400,44 @@ point_id,source,primary_stream,substream,asset_type,signal_key,display_name,unit
 ,cleanhedge,S1,bess_fast,bank,critical_alarm_active,Critical Alarm Active,,bms,U16,PERIODIC,1,,S1_FAST,T1_RAW_90D,false,r,bms_values.critical_alarm_active,DATA CH S1 SOURCE MAP:row57
 ,cleanhedge,S1,bess_fast,bank,precharge_contactor_closed,Precharge Contactor Closed,,bms,U16,PERIODIC,1,,S1_FAST,T1_RAW_90D,false,r,bms_values.precharge_contactor_closed,DATA CH S1 SOURCE MAP:row58
 ,cleanhedge,S1,bess_fast,bank,bau_soc_percent,Bau Soc Percent,%,bms,FLOAT32,PERIODIC,1,,S1_FAST,T1_RAW_90D,false,r,bms_values.bau_soc_percent,DATA CH S1 SOURCE MAP:row59
+,cleanhedge,S2,ems_system,bank,bank_voltage,Bank Voltage,0.1,measure,U16,PERIODIC,60,,fast,T2_1Y,false,r,bank.measure.bank_voltage,DATA S2.1 EMS System:row61
+,cleanhedge,S2,ems_system,bank,ibank,Bank Curr,0.1,measure,S32,PERIODIC,60,,fast,T2_1Y,false,r,bank.measure.ibank,DATA S2.1 EMS System:row62
+,cleanhedge,S2,ems_system,bank,soc,SOC,0.1,measure,U16,PERIODIC,60,,fast,T2_1Y,false,r,bank.measure.soc,DATA S2.1 EMS System:row63
+,cleanhedge,S2,ems_system,bank,bank_soh,SOH,0.1,measure,U16,PERIODIC,60,,fast,T2_1Y,false,r,bank.measure.bank_soh,DATA S2.1 EMS System:row64
+,cleanhedge,S2,ems_system,bank,ir,IR,,measure,U16,PERIODIC,60,,fast,T2_1Y,false,r,bank.measure.ir,DATA S2.1 EMS System:row65
+,cleanhedge,S2,ems_system,bank,echg_avl,E_chargable,,measure,U16,PERIODIC,60,,fast,T2_1Y,false,r,bank.measure.echg_avl,DATA S2.1 EMS System:row66
+,cleanhedge,S2,ems_system,bank,edsg_avl,E_dischargable,,measure,U16,PERIODIC,60,,fast,T2_1Y,false,r,bank.measure.edsg_avl,DATA S2.1 EMS System:row67
+,cleanhedge,S2,ems_system,bank,ibank_chg_lim,I_chg_limit,0.1,measure,U16,PERIODIC,60,,fast,T2_1Y,false,r,bank.measure.ibank_chg_lim,DATA S2.1 EMS System:row68
+,cleanhedge,S2,ems_system,bank,ibank_dsg_lim,I_dsg_limit,0.1,measure,U16,PERIODIC,60,,fast,T2_1Y,false,r,bank.measure.ibank_dsg_lim,DATA S2.1 EMS System:row69
+,cleanhedge,S2,ems_system,bank,irack_diff,Max IRack Diff,0.1,measure,U16,PERIODIC,60,,fast,T2_1Y,false,r,bank.measure.irack_diff,DATA S2.1 EMS System:row70
+,cleanhedge,S2,ems_system,bank,vrack_diff,Max Vrack Diff,0.1,measure,U16,PERIODIC,60,,fast,T2_1Y,false,r,bank.measure.vrack_diff,DATA S2.1 EMS System:row71
+,cleanhedge,S2,ems_system,bank,vcell_max_pack,Bank Max Vol Pack Num,,measure,U16,PERIODIC,60,,fast,T2_1Y,false,r,bank.measure.vcell_max_pack,DATA S2.1 EMS System:row72
+,cleanhedge,S2,ems_system,bank,vcell_max_position,Bank Max Vol Cell Num,,measure,U16,PERIODIC,60,,fast,T2_1Y,false,r,bank.measure.vcell_max_position,DATA S2.1 EMS System:row73
+,cleanhedge,S2,ems_system,bank,vcell_max,Vcell_max,,measure,U16,PERIODIC,60,,fast,T2_1Y,false,r,bank.measure.vcell_max,DATA S2.1 EMS System:row74
+,cleanhedge,S2,ems_system,bank,vcell_min_pack,Bank Min Vol Pack Num,,measure,U16,PERIODIC,60,,fast,T2_1Y,false,r,bank.measure.vcell_min_pack,DATA S2.1 EMS System:row75
+,cleanhedge,S2,ems_system,bank,vcell_min_position,Bank Min Vol Cell Num,,measure,U16,PERIODIC,60,,fast,T2_1Y,false,r,bank.measure.vcell_min_position,DATA S2.1 EMS System:row76
+,cleanhedge,S2,ems_system,bank,vcell_min,Vcell_min,,measure,U16,PERIODIC,60,,fast,T2_1Y,false,r,bank.measure.vcell_min,DATA S2.1 EMS System:row77
+,cleanhedge,S2,ems_system,bank,vavg,Vcell_avg,,measure,U16,PERIODIC,60,,fast,T2_1Y,false,r,bank.measure.vavg,DATA S2.1 EMS System:row78
+,cleanhedge,S2,ems_system,bank,tcell_max_rack,Bank Max Temp Pack Num,,measure,U16,PERIODIC,60,,fast,T2_1Y,false,r,bank.measure.tcell_max_rack,DATA S2.1 EMS System:row79
+,cleanhedge,S2,ems_system,bank,tcell_max_pack,Bank Max Temp Cell Num,,measure,U16,PERIODIC,60,,fast,T2_1Y,false,r,bank.measure.tcell_max_pack,DATA S2.1 EMS System:row80
+,cleanhedge,S2,ems_system,bank,tcell_max_position,Bank Max Vol Cell Num,,measure,U16,PERIODIC,60,,fast,T2_1Y,false,r,bank.measure.tcell_max_position,DATA S2.1 EMS System:row81
+,cleanhedge,S2,ems_system,bank,tcell_max,Tcell_max,0.1,measure,S16,PERIODIC,60,,fast,T2_1Y,false,r,bank.measure.tcell_max,DATA S2.1 EMS System:row82
+,cleanhedge,S2,ems_system,bank,tcell_min_rack,Bank Min Temp Rack Num,,measure,U16,PERIODIC,60,,fast,T2_1Y,false,r,bank.measure.tcell_min_rack,DATA S2.1 EMS System:row83
+,cleanhedge,S2,ems_system,bank,tcell_min_pack,Bank Min Temp Pack Num,,measure,U16,PERIODIC,60,,fast,T2_1Y,false,r,bank.measure.tcell_min_pack,DATA S2.1 EMS System:row84
+,cleanhedge,S2,ems_system,bank,tcell_min_position,Bank Min Temp Cell Num,,measure,U16,PERIODIC,60,,fast,T2_1Y,false,r,bank.measure.tcell_min_position,DATA S2.1 EMS System:row85
+,cleanhedge,S2,ems_system,bank,tcell_min,Tcell_min,0.1,measure,S16,PERIODIC,60,,fast,T2_1Y,false,r,bank.measure.tcell_min,DATA S2.1 EMS System:row86
+,cleanhedge,S2,ems_system,bank,tavg,Tcell_avg,0.1,measure,S16,PERIODIC,60,,fast,T2_1Y,false,r,bank.measure.tavg,DATA S2.1 EMS System:row87
+,cleanhedge,S2,ems_system,bank,bank_echg_cum,E_chg_sum,,measure,U32,PERIODIC,60,,fast,T2_1Y,false,r,bank.measure.bank_echg_cum,DATA S2.1 EMS System:row88
+,cleanhedge,S2,ems_system,bank,bank_edsg_cum,E_dsg_sum,,measure,U32,PERIODIC,60,,fast,T2_1Y,false,r,bank.measure.bank_edsg_cum,DATA S2.1 EMS System:row89
+,cleanhedge,S2,ems_system,bank,grid_connect_clu_num,Conn Racks,,measure,U16,PERIODIC,60,,fast,T2_1Y,false,r,bank.measure.grid_connect_clu_num,DATA S2.1 EMS System:row90
+,cleanhedge,S2,ems_system,bank,system_total_racks,System Total Racks,,measure,U16,PERIODIC,60,,fast,T2_1Y,false,r,bank.measure.system_total_racks,DATA S2.1 EMS System:row91
+,cleanhedge,S2,ems_system,bank,min_connected_racks,Minimum Connected Racks Number,,measure,U16,PERIODIC,60,,fast,T2_1Y,false,r,bank.measure.min_connected_racks,DATA S2.1 EMS System:row92
+,cleanhedge,S2,ems_system,bank,bank_dsgable_power,BankDsg Power Limit,,measure,U16,PERIODIC,60,,fast,T2_1Y,false,r,bank.measure.bank_dsgable_power,DATA S2.1 EMS System:row93
+,cleanhedge,S2,ems_system,bank,bank_chgable_power,Bank  Chg Power Limit,,measure,U16,PERIODIC,60,,fast,T2_1Y,false,r,bank.measure.bank_chgable_power,DATA S2.1 EMS System:row94
+,cleanhedge,S2,ems_system,bank,bank_today_dsg_energy,Today Dsg Cum Cap,,measure,U16,PERIODIC,300,,fast,T2_1Y,false,r,bank.measure.bank_today_dsg_energy,DATA S2.1 EMS System:row95
+,cleanhedge,S2,ems_system,bank,bank_today_chg_energy,Today Chg Cum Cap,,measure,U16,PERIODIC,300,,fast,T2_1Y,false,r,bank.measure.bank_today_chg_energy,DATA S2.1 EMS System:row96
+,cleanhedge,S2,ems_system,bank,month_echg_cum,Month Echg Cum,,measure,U32,PERIODIC,60,,fast,T2_1Y,false,r,bank.measure.month_echg_cum,DATA S2.1 EMS System:row97
+,cleanhedge,S2,ems_system,bank,month_edsg_cum,Month Edsg Cum,,measure,U32,PERIODIC,60,,fast,T2_1Y,false,r,bank.measure.month_edsg_cum,DATA S2.1 EMS System:row98
+,cleanhedge,S2,ems_system,bank,year_echg_cum,Year Echg Cum,,measure,U32,PERIODIC,60,,fast,T2_1Y,false,r,bank.measure.year_echg_cum,DATA S2.1 EMS System:row99
+,cleanhedge,S2,ems_system,bank,year_edsg_cum,Year Edsg Cum,,measure,U32,PERIODIC,60,,fast,T2_1Y,false,r,bank.measure.year_edsg_cum,DATA S2.1 EMS System:row100
+,cleanhedge,S2,ems_system,bank,system_soc,system_soc,%,system_data,FLOAT32,PERIODIC,60,,PLANT_ANALOG,T2_1Y,false,r,bank.system_data.system_soc,DATA S2.1 EMS System:row60
