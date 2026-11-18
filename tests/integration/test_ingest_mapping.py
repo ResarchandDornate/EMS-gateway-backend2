@@ -198,11 +198,18 @@ def test_real_seed_builds_and_routes():
                          r["signal_key"].strip(), (r["asset_type"] or "").strip() or None,
                          (r["data_type"] or "").strip(), (r["retention_class"] or "").strip()))
     idx = RegistryIndex.from_rows(rows)          # raises RegistryConflict if the seed had dupes
-    assert len(idx) == 2534
+    # Integrity: one entry per distinct (stream, substream, signal_key) -- derived,
+    # tracks the seed and still trips if from_rows ever silently merges rows.
+    distinct_keys = {(ps, sub, key) for ps, sub, key, *_ in rows}
+    assert len(idx) == len(distinct_keys)
+    # Regression tripwire on the documented per-stream totals (one source of truth).
+    s1_rows = sum(1 for ps, *_ in rows if ps == "S1")
+    s2_rows = sum(1 for ps, *_ in rows if ps == "S2")
+    assert (s1_rows, s2_rows) == (55, 3401)  # +Phase F-1 fire DIs di4h, di13h
     # S1 -> raw, S2 T2 -> long, real T3 -> 3y
     from src.ingestion.mapping import build_message_points
     id2 = {"organization_id": "org1", "site_id": "site1", "gateway_id": "gw1"}
-    assert build_message_points(_env("S1", "bess_fast", [_rec("soc", 50.0, asset_id="pcs1")]),
+    assert build_message_points(_env("S1", "bess_fast", [_rec("soc_percent", 50.0, asset_id="bank1")]),
                                 id2, idx, SETTINGS)[0][0] == "telemetry_raw_90d"
     assert build_message_points(_env("S2", "bms_extended", [_rec("rack_operating_state", 5)]),
                                 id2, idx, SETTINGS)[0][0] == "telemetry_1y"
