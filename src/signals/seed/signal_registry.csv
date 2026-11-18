@@ -3453,3 +3453,5 @@ point_id,source,primary_stream,substream,asset_type,signal_key,display_name,unit
 ,cleanhedge,S2,io_module,bms_environment,aircond_1_54,HVAC Dehumidify Hysteresis,%,io_module,U16,ON_CHANGE_HEARTBEAT,21600,,SETTING,T2_1Y,false,r,telemetry.environment.aircond_1_54,DATA S2.4 IO Module:row65
 ,cleanhedge,S2,io_module,bms_environment,aircond_1_57,HVAC High Humidity Setpoint,%,io_module,U16,ON_CHANGE_HEARTBEAT,21600,,SETTING,T2_1Y,false,r,telemetry.environment.aircond_1_57,DATA S2.4 IO Module:row68
 ,cleanhedge,S2,fire_protection,bms_environment,di6h,Fire Alarm Level 1 (DI6),,fire_protection,U16,ON_CHANGE_HEARTBEAT,300,,STATE,T2_1Y,false,r,telemetry.environment.di6h,DATA S2.6 Fire Protection:row22
+,cleanhedge,S2,fire_protection,bms_environment,di4h,Fire Alarm Level 2 (DI4),,fire_protection,U16,ON_CHANGE_HEARTBEAT,60,,STATE,T2_1Y,false,r,telemetry.environment.di4h,DATA S2.6 Fire Protection:row21
+,cleanhedge,S2,fire_protection,bms_environment,di13h,Fire Spray FBK (DI13),,fire_protection,U16,PERIODIC,60,,STATE,T2_1Y,false,r,telemetry.environment.di13h,DATA S2.6 Fire Protection:row23

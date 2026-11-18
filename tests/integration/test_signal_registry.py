@@ -8,14 +8,14 @@ from src.signals.service import (
 
 # expected canonical counts verified against the workbooks
 S1_COUNT = 55  # CleanEdge v2.1 Phase 6.1: legacy 63 ornate S1 replaced by 55 normalized fields
-S2_TOTAL = 3399  # 3391 + Phase C 5.12 env: 7 io_module aircond + 1 fire_protection di6h
+S2_TOTAL = 3401  # Phase F-1: +di4h +di13h fire DIs (was 3399 after Phase C)
 S2_BY_SUBSTREAM = {
     "ems_system": 88,  # 45 Kalpa + 43 CleanEdge (Phase 5.11: 41; Phase 5.13: +2 plant daily energy)
     "pcs_extended": 343,  # 86 Kalpa + 257 CleanEdge (Phase 5.9.2: 255; Phase 5.13: +2 PCS cumulative energy)
     "bms_extended": 2692,  # 2255 Kalpa + 437 CleanEdge v2.1 (Phase 5.10 BMS)
     "io_module": 77,          # 17 Kalpa + 60 CleanEdge (Phase C: +7 aircond HVAC)
     "liquid_cooling": 66,     # 26 Kalpa + 40 CleanEdge
-    "fire_protection": 8,  # 7 Kalpa + 1 CleanEdge (Phase C: di6h fire_alarm_level_1)
+    "fire_protection": 10,  # 7 Kalpa + 3 CleanEdge (di6h, di4h, di13h)
     "dehumidifier": 27,       # 9 Kalpa + 18 CleanEdge
     "remote_control": 26,
     # CleanEdge v2.0 AVAILABLE_NOW meter/solar signals
