@@ -1,0 +1,10 @@
+signal_key,substream,source,current_retention_class,proposed_retention_class,reason
+system_grid_frequency,pcs_extended,cleanhedge,T1_RAW_90D,T2_1Y,writer routes S2 to telemetry_1y; read-path bucket_for(T1_RAW_90D) targets empty raw bucket -> reads empty. NOT APPLIED; review before any registry change.
+total_active_power,pcs_extended,cleanhedge,T1_RAW_90D,T2_1Y,writer routes S2 to telemetry_1y; read-path bucket_for(T1_RAW_90D) targets empty raw bucket -> reads empty. NOT APPLIED; review before any registry change.
+total_power_factor,pcs_extended,cleanhedge,T1_RAW_90D,T2_1Y,writer routes S2 to telemetry_1y; read-path bucket_for(T1_RAW_90D) targets empty raw bucket -> reads empty. NOT APPLIED; review before any registry change.
+total_reactive_power,pcs_extended,cleanhedge,T1_RAW_90D,T2_1Y,writer routes S2 to telemetry_1y; read-path bucket_for(T1_RAW_90D) targets empty raw bucket -> reads empty. NOT APPLIED; review before any registry change.
+aircond_1_10,io_module,cleanhedge,T1_RAW_90D,T2_1Y,writer routes S2 to telemetry_1y; read-path bucket_for(T1_RAW_90D) targets empty raw bucket -> reads empty. NOT APPLIED; review before any registry change.
+liquidcool_1_1,liquid_cooling,cleanhedge,T1_RAW_90D,T2_1Y,writer routes S2 to telemetry_1y; read-path bucket_for(T1_RAW_90D) targets empty raw bucket -> reads empty. NOT APPLIED; review before any registry change.
+liquidcool_1_4,liquid_cooling,cleanhedge,T1_RAW_90D,T2_1Y,writer routes S2 to telemetry_1y; read-path bucket_for(T1_RAW_90D) targets empty raw bucket -> reads empty. NOT APPLIED; review before any registry change.
+liquidcool_1_5,liquid_cooling,cleanhedge,T1_RAW_90D,T2_1Y,writer routes S2 to telemetry_1y; read-path bucket_for(T1_RAW_90D) targets empty raw bucket -> reads empty. NOT APPLIED; review before any registry change.
+liquidcool_1_10,liquid_cooling,cleanhedge,T1_RAW_90D,T2_1Y,writer routes S2 to telemetry_1y; read-path bucket_for(T1_RAW_90D) targets empty raw bucket -> reads empty. NOT APPLIED; review before any registry change.

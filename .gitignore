@@ -16,3 +16,7 @@ __pycache__/
 !.env.example
 !.env.staging.example
 .env.bak*
+d9run/
+*.bak
+phase1a_*.csv
+.pytest_cache/_stage/

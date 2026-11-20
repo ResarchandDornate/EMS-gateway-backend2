@@ -156,7 +156,8 @@ async def load_registry_index(session) -> RegistryIndex:
     rows = (await session.execute(
         select(SignalRegistryModel.primary_stream, SignalRegistryModel.substream,
                SignalRegistryModel.signal_key, SignalRegistryModel.asset_type,
-               SignalRegistryModel.data_type, SignalRegistryModel.retention_class)
+               SignalRegistryModel.data_type, SignalRegistryModel.retention_class,
+               SignalRegistryModel.point_id)
     )).all()
     return RegistryIndex.from_rows(rows)
 

@@ -18,6 +18,8 @@ from types import SimpleNamespace
 
 import pytest
 
+from src.influx import RegistryIndex
+
 from src.ingestion import stream_service as ss
 from src.ingestion.service import IngestDecision, LEASE_TTL_SECONDS
 from src.ingestion.health_service import StoreNotConfirmed
@@ -230,7 +232,12 @@ async def test_batch_mixed_accepted_rejected(monkeypatch):
     body = {"request_id": "rq", "gateway_id": "g", "sent_at_utc": "2026-11-02T06:00:00Z",
             "messages": [{"message_id": "good"}, {"message_id": "bad"}]}
     influx = SimpleNamespace(settings=None)   # build_influx_points reads influx.settings
-    resp = await r._ingest_batch(body, session=object(), gw=_Gw(), influx=influx)
+    # minimal real registry index: implements t3_signal_keys() exactly as _ingest_batch calls it
+    index = RegistryIndex.from_rows([
+        ("S2", "x", "sig_t3", None, "float", "T3_3Y"),
+        ("S2", "x", "sig_1y", None, "float", "T2_1Y"),
+    ])
+    resp = await r._ingest_batch(body, session=object(), gw=_Gw(), influx=influx, index=index)
     data = json.loads(resp.body)
     assert {a["message_id"] for a in data["accepted"]} == {"good"}
     assert {x["message_id"] for x in data["rejected"]} == {"bad"}

@@ -3,7 +3,7 @@ from __future__ import annotations
 import re
 from collections import defaultdict
 from contextlib import asynccontextmanager
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import datetime, timezone
 
 from influxdb_client import Point
@@ -12,10 +12,12 @@ from influxdb_client.client.influxdb_client_async import InfluxDBClientAsync
 from src.config import get_settings
 from src.signals.types import QUALITY_SUFFIX, coerce, validate_quality
 from src.telemetry_errors import (
+    AmbiguousPointId,
     InvalidTimestamp,
     RegistryConflict,
     RetentionNotConfigured,
     SignalMismatch,
+    UnknownPointId,
     UnknownRetentionClass,
     UnknownSignal,
     UnresolvedMetadata,
@@ -103,27 +105,67 @@ class RegistrySignal:
     retention_class: str
 
 
+_AMBIGUOUS_POINT_ID = object()   # sentinel: a point_id mapped to >1 distinct signal
+
+
 @dataclass
 class RegistryIndex:
-    """Trusted signal metadata from signal_registry, keyed by (measurement, signal_key)."""
+    """Trusted signal metadata from signal_registry, keyed by (measurement, signal_key).
+
+    Also carries an additive point_id -> (measurement, signal_key) index built from the
+    populated registry point_id column (T2 CleanEdge + T3 Kalpa). The point_id lookup is
+    optional and never alters the existing (measurement, signal_key) resolution."""
     _by_key: dict
+    _by_point_id: dict = field(default_factory=dict)
 
     @classmethod
     def from_rows(cls, rows) -> "RegistryIndex":
-        # rows: (primary_stream, substream, signal_key, asset_type, data_type, retention_class)
+        # rows: (primary_stream, substream, signal_key, asset_type, data_type, retention_class[, point_id])
         d = {}
-        for ps, sub, key, asset_type, dt, rc in rows:
+        pid_map = {}
+        for row in rows:
+            ps, sub, key, asset_type, dt, rc = row[0], row[1], row[2], row[3], row[4], row[5]
+            point_id = row[6] if len(row) > 6 else None
             k = (measurement_for(ps, sub), key)
             if k in d:
                 raise RegistryConflict(f"duplicate (measurement, signal_key): {k}")
             d[k] = RegistrySignal(ps, sub, asset_type, dt, rc)
-        return cls(d)
+            pid = point_id.strip() if isinstance(point_id, str) else point_id
+            if pid:                                   # only populated, verified point_ids
+                if pid in pid_map and pid_map[pid] != k:
+                    pid_map[pid] = _AMBIGUOUS_POINT_ID
+                elif pid not in pid_map:
+                    pid_map[pid] = k
+        return cls(d, pid_map)
 
     def resolve(self, measurement: str, signal_key: str) -> RegistrySignal:
         try:
             return self._by_key[(measurement, signal_key)]
         except KeyError:
             raise UnknownSignal(f"signal not in registry: {measurement}/{signal_key}")
+
+    def resolve_point_id(self, point_id: str):
+        """point_id -> (measurement, signal_key, RegistrySignal). Additive and exact; never
+        falls back to a different signal. Raises UnknownPointId when the id is absent or
+        unpopulated, AmbiguousPointId when it maps to more than one registry signal."""
+        entry = self._by_point_id.get(point_id)
+        if entry is None:
+            raise UnknownPointId(f"point_id not in registry: {point_id}")
+        if entry is _AMBIGUOUS_POINT_ID:
+            raise AmbiguousPointId(f"point_id resolves to multiple signals: {point_id}")
+        measurement, signal_key = entry
+        return measurement, signal_key, self._by_key[entry]
+
+    def t3_signal_keys(self) -> frozenset:
+        """Signal keys whose registry retention_class is T3_3Y — the writer's source of
+        truth for 3-year routing, consistent with bucket_for. Cached (registry is
+        process-lived)."""
+        t3 = getattr(self, "_t3_cache", None)
+        if t3 is None:
+            t3 = frozenset(sk for (_m, sk), sig in self._by_key.items()
+                           if sig.retention_class == "T3_3Y")
+            self._t3_cache = t3
+        return t3
 
     def __len__(self) -> int:
         return len(self._by_key)
@@ -262,7 +304,7 @@ class InfluxGateway:
             return await c.query_api().query(flux)
 
     async def latest_signal(self, bucket, measurement, site_id, signal_key,
-                            asset_id=None, source_id=None, start="-1h"):
+                            asset_id=None, source_id=None, start="-1h", point_id=None):
         _ident("bucket", bucket); _ident("measurement", measurement); _ident("site_id", site_id)
         _ident("signal_key", signal_key); _range(start)
         extra = ""
@@ -270,6 +312,8 @@ class InfluxGateway:
             extra += f' and r.asset_id == "{_ident("asset_id", asset_id)}"'
         if source_id:
             extra += f' and r.source_id == "{_ident("source_id", source_id)}"'
+        if point_id:
+            extra += f' and r.point_id == "{_ident("point_id", point_id)}"'
         flux = (
             f'from(bucket: "{bucket}")\n'
             f'  |> range(start: {start})\n'
@@ -279,21 +323,22 @@ class InfluxGateway:
         )
         return await self.query(flux)
 
-    async def latest_by_asset(self, bucket, measurement, site_id, signal_key, start="-1h"):
+    async def latest_by_asset(self, bucket, measurement, site_id, signal_key, start="-1h", point_id=None):
         _ident("bucket", bucket); _ident("measurement", measurement); _ident("site_id", site_id)
         _ident("signal_key", signal_key); _range(start)
+        extra = f' and r.point_id == "{_ident("point_id", point_id)}"' if point_id else ""
         flux = (
             f'from(bucket: "{bucket}")\n'
             f'  |> range(start: {start})\n'
             f'  |> filter(fn: (r) => r._measurement == "{measurement}" '
-            f'and r.site_id == "{site_id}" and r._field == "{signal_key}")\n'
+            f'and r.site_id == "{site_id}" and r._field == "{signal_key}"{extra})\n'
             f'  |> group(columns: ["asset_id", "source_id"])\n'
             f'  |> last()'
         )
         return await self.query(flux)
 
     async def series(self, bucket, measurement, site_id, signal_key, start, stop,
-                     asset_id=None, source_id=None, limit=1000):
+                     asset_id=None, source_id=None, limit=1000, point_id=None):
         """Bounded, site-scoped time-series read. All identifiers/ranges are guarded;
         never queries without site_id. The caller enforces window + limit caps; this
         method also refuses a non-positive limit. Points are time-sorted ascending."""
@@ -306,6 +351,8 @@ class InfluxGateway:
             extra += f' and r.asset_id == "{_ident("asset_id", asset_id)}"'
         if source_id:
             extra += f' and r.source_id == "{_ident("source_id", source_id)}"'
+        if point_id:
+            extra += f' and r.point_id == "{_ident("point_id", point_id)}"'
         flux = (
             f'from(bucket: "{bucket}")\n'
             f'  |> range(start: {start}, stop: {stop})\n'
@@ -317,7 +364,7 @@ class InfluxGateway:
         return await self.query(flux)
 
     async def aggregate(self, bucket, measurement, site_id, signal_key,
-                        start, stop, every, flux_fn, asset_id, source_id=None):
+                        start, stop, every, flux_fn, asset_id, source_id=None, point_id=None):
         """Bounded, site-scoped, time-bucketed read. SPARSE: createEmpty is false, so
         only windows containing data are returned (missing timestamps = gaps, not zero).
         The caller validates window/fn/bucket-count and maps fn to a fixed Flux name; this
@@ -330,6 +377,8 @@ class InfluxGateway:
         extra = f' and r.asset_id == "{_ident("asset_id", asset_id)}"'
         if source_id:
             extra += f' and r.source_id == "{_ident("source_id", source_id)}"'
+        if point_id:
+            extra += f' and r.point_id == "{_ident("point_id", point_id)}"'
         flux = (
             f'from(bucket: "{bucket}")\n'
             f'  |> range(start: {start}, stop: {stop})\n'
