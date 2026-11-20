@@ -19,6 +19,17 @@ class HealthOut(BaseModel):              # S3
     payload: Any
 
 
+class AlarmCatalogOut(BaseModel):         # CG-33 S4 catalogue (resolved from signal_name)
+    model_config = _C
+    code: str
+    english_name: str
+    severity: str | None = None
+    category: str | None = None
+    device_type: str | None = None
+    description: str | None = None
+    operator_action: str | None = None
+
+
 class AlarmOut(BaseModel):               # S4
     model_config = _C
     gateway_id: uuid.UUID
@@ -31,6 +42,8 @@ class AlarmOut(BaseModel):               # S4
     correlation_id: str | None
     occurred_at: datetime
     payload: Any
+    # CG-33: catalogue definition for this event's signal_name (None if unmatched).
+    catalog: AlarmCatalogOut | None = None
 
 
 class ControllerOut(BaseModel):          # S5

@@ -22,6 +22,7 @@ from src.ingestion.solis_models import SolisTelemetryRecordModel as S6M
 from src.ingestion.edge_ai_models import EdgeAiInferenceRecordModel as S7M
 from src.ingestion.config_audit_models import ConfigurationAuditRecordModel as S8M
 from src.ingestion.command_result_models import CommandResultRecordModel as S9M
+from src.ingestion.alarm_catalog_models import AlarmCatalogModel
 from src.structured_reads import ranges, schemas as S
 from src.structured_reads.summary import summarize
 
@@ -136,7 +137,32 @@ async def alarms(severity: str | None = Query(None), event_type: str | None = Qu
                       (S4M.event_type, event_type), (S4M.state, state),
                       (S4M.correlation_id, correlation_id))
     rows, more = await _page(session, stmt, limit, offset)
-    return _resp(site_id, rows, more, limit, offset, S.AlarmOut)
+    results = [S.AlarmOut.model_validate(r) for r in rows]
+    # CG-33 enrichment (best-effort): resolve each event's signal_name against the
+    # alarm catalogue by code, falling back to runtime_key. Never breaks the read.
+    try:
+        names = {r.payload.get("signal_name") for r in rows
+                 if isinstance(r.payload, dict) and r.payload.get("signal_name")}
+        if names:
+            cat_rows = (await session.execute(
+                select(AlarmCatalogModel).where(
+                    AlarmCatalogModel.code.in_(names) | AlarmCatalogModel.runtime_key.in_(names)
+                )
+            )).scalars().all()
+            cmap: dict = {}
+            for c in cat_rows:
+                co = S.AlarmCatalogOut.model_validate(c)
+                if c.code:
+                    cmap.setdefault(c.code, co)
+                if c.runtime_key:
+                    cmap.setdefault(c.runtime_key, co)
+            for ao, r in zip(results, rows):
+                sn = r.payload.get("signal_name") if isinstance(r.payload, dict) else None
+                if sn and sn in cmap:
+                    ao.catalog = cmap[sn]
+    except Exception:
+        pass  # enrichment is additive and best-effort
+    return {"site_id": site_id, "limit": limit, "offset": offset, "has_more": more, "results": results}
 
 
 @router.get("/alarms/summary")

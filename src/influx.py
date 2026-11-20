@@ -318,7 +318,8 @@ class InfluxGateway:
             f'from(bucket: "{bucket}")\n'
             f'  |> range(start: {start})\n'
             f'  |> filter(fn: (r) => r._measurement == "{measurement}" '
-            f'and r.site_id == "{site_id}" and r._field == "{signal_key}"{extra})\n'
+            f'and r.site_id == "{site_id}" and (r._field == "{signal_key}" or r._field == "{signal_key}{QUALITY_SUFFIX}"){extra})\n'
+            f'  |> group(columns: ["_field"])\n'
             f'  |> last()'
         )
         return await self.query(flux)
@@ -331,8 +332,8 @@ class InfluxGateway:
             f'from(bucket: "{bucket}")\n'
             f'  |> range(start: {start})\n'
             f'  |> filter(fn: (r) => r._measurement == "{measurement}" '
-            f'and r.site_id == "{site_id}" and r._field == "{signal_key}"{extra})\n'
-            f'  |> group(columns: ["asset_id", "source_id"])\n'
+            f'and r.site_id == "{site_id}" and (r._field == "{signal_key}" or r._field == "{signal_key}{QUALITY_SUFFIX}"){extra})\n'
+            f'  |> group(columns: ["asset_id", "source_id", "_field"])\n'
             f'  |> last()'
         )
         return await self.query(flux)

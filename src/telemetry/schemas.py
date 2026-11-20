@@ -9,6 +9,7 @@ class LatestPoint(BaseModel):
     source_id: str | None
     value: float | int | None
     time: datetime | None
+    quality: str | None = None
 
 
 class LatestResponse(BaseModel):

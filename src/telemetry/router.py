@@ -3,6 +3,7 @@ import uuid
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 
 from src.influx import _ident, bucket_for, measurement_for, rows
+from src.signals.types import QUALITY_SUFFIX
 from src.signals.types import field_type
 from src.telemetry import service as svc
 from src.telemetry.dependencies import require_site_read
@@ -84,8 +85,15 @@ async def latest(
         raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT, "invalid request")
     except Exception:
         raise HTTPException(status.HTTP_503_SERVICE_UNAVAILABLE, "telemetry store unavailable")
+    # CG-08/15/16: pair each value with its companion quality field ("<signal_key>_q")
+    # so the UI can tell good / missing / unsupported apart.
+    qkey = f"{signal_key}{QUALITY_SUFFIX}"
+    quality_by = {(r["asset_id"], r["source_id"]): r["value"]
+                  for r in recs if r["field"] == qkey}
     results = [LatestPoint(asset_id=r["asset_id"], source_id=r["source_id"],
-                           value=r["value"], time=r["time"]) for r in recs]
+                           value=r["value"], time=r["time"],
+                           quality=quality_by.get((r["asset_id"], r["source_id"])))
+               for r in recs if r["field"] == signal_key]
     return LatestResponse(site_id=site_id, stream=stream, substream=substream,
                           signal_key=signal_key, results=results)
 
