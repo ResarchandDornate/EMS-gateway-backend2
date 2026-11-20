@@ -16,6 +16,7 @@ class Settings(BaseSettings):
     influx_bucket_long: str
     influx_bucket_test: str = "telemetry_test"
     influx_bucket_3y: str = "telemetry_3y"
+    s2_point_id_tag_enabled: bool = True   # Phase 2: additive S2 point_id tag on NEW writes
     influx_bucket_3y_retention_seconds: int = Field(default=94_608_000, gt=0)  # 1095 d (PROPOSED, not prod-approved)
     # Explicit Influx connect/write timeout (ms). Bounds every S2 write so a hung
     # connection fails fast and predictably instead of stalling the request. MUST stay

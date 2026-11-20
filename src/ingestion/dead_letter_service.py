@@ -75,8 +75,10 @@ async def replay_dead_letter(session, *, dlq_id, gw, identity, influx, envelope_
     if dl is None or dl.status != "parked":
         return False
     try:
+        from src.signals.service import load_registry_index   # local import avoids import cycle
         envelope = envelope_factory(dl.payload)
-        points = build_influx_points(envelope, identity, influx.settings)
+        idx = await load_registry_index(session)
+        points = build_influx_points(envelope, identity, influx.settings, idx.t3_signal_keys(), resolve_point_id=idx.resolve_point_id)
     except Exception:
         return False                                  # still unshapeable -> leave parked
     if points:

@@ -19,7 +19,7 @@ class SignalRegistryModel(BaseEntityModel):
                          name="uq_signal_registry_point"),
     )
 
-    point_id: Mapped[str | None] = mapped_column(String(64), index=True)   # Ornate p-id; null for Kalpa
+    point_id: Mapped[str | None] = mapped_column(String(128), index=True)   # Ornate p-id; null for Kalpa
     source: Mapped[str] = mapped_column(String(16))                         # ornate | kalpa
     primary_stream: Mapped[str] = mapped_column(String(8), index=True)      # S1 | S2
     substream: Mapped[str] = mapped_column(String(32), index=True)

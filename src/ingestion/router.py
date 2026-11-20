@@ -140,7 +140,7 @@ async def ingest(
 
     # Legacy batch wrapper (no top-level stream, has messages[]) -> adapter path.
     if is_batch_body(body):
-        return await _ingest_batch(body, session, gw, influx)
+        return await _ingest_batch(body, session, gw, influx, index)
 
     stream = body.get("stream") if isinstance(body, dict) else None
     route = route_stream(stream if isinstance(stream, str) else "")
@@ -185,7 +185,7 @@ _BATCH_DEDICATED = {
 }
 
 
-async def _ingest_batch(body, session, gw, influx) -> JSONResponse:
+async def _ingest_batch(body, session, gw, influx, index) -> JSONResponse:
     """Legacy TransportBatch adapter. Returns the gateway's ACK contract (HTTP 200 with
     accepted[]/rejected[]). fast_bess_telemetry -> S1 structured JSONB, stored verbatim;
     unsupported streams and bad messages -> rejected with retryable:true so the gateway
@@ -245,7 +245,7 @@ async def _ingest_batch(body, session, gw, influx) -> JSONResponse:
                 decision = await persist_fast_bess_message(
                     session, gw=gw, identity=identity, envelope=envelope)
             elif code == "S2":                            # S2 -> deferred; one bulk Influx write below
-                s2_items.append((envelope, build_influx_points(envelope, identity, influx.settings)))
+                s2_items.append((envelope, build_influx_points(envelope, identity, influx.settings, index.t3_signal_keys(), resolve_point_id=index.resolve_point_id)))
                 continue
             elif code in _BATCH_DEDICATED:                # S3-S9 -> dedicated per-stream table
                 _persist = _BATCH_DEDICATED[code][1]

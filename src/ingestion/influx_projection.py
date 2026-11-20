@@ -6,7 +6,8 @@ InfluxDB. S1 is mixed-type structured and stays in PostgreSQL JSONB; S3..S10 are
 into InfluxDB.
 
 S2 -> one point per record, measurement s2_<substream>, asset tag = runtime_asset_id, long
-(1y) bucket - except the 12 energy/capacity signals which route to the 3y bucket. Native
+(1y) bucket - except signals whose registry retention_class is T3_3Y (shared registry via
+t3_signal_keys; the hardcoded set below is a fallback). Native
 field types (float / bool / string; null readings skipped; lists/dicts JSON-encoded).
 Registry is bypassed (real signal names do not match it).
 
@@ -26,7 +27,9 @@ from influxdb_client import Point
 from src.influx import QUALITY_SUFFIX, measurement_for
 from src.ingestion.s3_health import parse_record_timestamp
 from src.telemetry_errors import InvalidValue
+from src.telemetry_errors import UnknownPointId, AmbiguousPointId
 
+# FALLBACK T3 set (used only when the registry-derived t3_signal_keys is not supplied).
 # 12 energy/capacity signals -> T3 (3-year) bucket (energy_capacity_retention.csv).
 ENERGY_T3_SIGNALS = frozenset({
     "system_charge_energy_session", "system_discharge_energy_session",
@@ -76,7 +79,7 @@ def _point(meas, tags: dict, signal_key, fv, quality, dt):
     return pt.time(dt)
 
 
-def _s2_points(envelope, identity, settings):
+def _s2_points(envelope, identity, settings, t3_signal_keys=None, resolve_point_id=None):
     """Project every S2 record into (bucket, Point). A null-valued record is skipped
     (null reading); any other unshapeable record raises InvalidValue so the whole message
     is rejected before claim/store."""
@@ -103,13 +106,31 @@ def _s2_points(envelope, identity, settings):
             raise InvalidValue(f"S2 signal {signal!r} has no parseable timestamp")
         tags = {**base, "source_id": rec.get("source_id"),
                 "asset_id": rec.get("runtime_asset_id") or rec.get("base_asset_id")}
-        bucket = (settings.influx_bucket_3y if signal in ENERGY_T3_SIGNALS
+        pid = rec.get("point_id")
+        if (getattr(settings, "s2_point_id_tag_enabled", True) and isinstance(pid, str)
+                and pid.strip() and resolve_point_id is not None):
+            # Validate BEFORE writing: the gateway-emitted point_id must resolve UNIQUELY in the
+            # approved registry AND belong to THIS record's exact (measurement, signal_key) -- the
+            # ONLY identity dimensions the registry defines for a point_id (_by_point_id maps
+            # point_id -> (measurement, signal_key); runtime_asset_id/asset_type are NOT part of
+            # that mapping, so no asset comparison is invented). Unknown / ambiguous / mismatched
+            # -> omit the point_id tag (record + all fields still written). Fail-closed: with no
+            # resolver, production never emits an unvalidated point_id tag.
+            pid_s = pid.strip()
+            try:
+                r_meas, r_key, _sig = resolve_point_id(pid_s)
+            except (UnknownPointId, AmbiguousPointId):
+                r_meas = r_key = None
+            if r_meas == meas and r_key == signal:
+                tags["point_id"] = pid_s
+        t3 = ENERGY_T3_SIGNALS if t3_signal_keys is None else t3_signal_keys
+        bucket = (settings.influx_bucket_3y if signal in t3
                   else settings.influx_bucket_long)
         out.append((bucket, _point(meas, tags, signal, fv, rec.get("quality"), dt)))
     return out
 
 
-def build_influx_points(envelope, identity, settings):
+def build_influx_points(envelope, identity, settings, t3_signal_keys=None, resolve_point_id=None):
     """Return [(bucket, Point), ...] for S2 numeric telemetry; [] for any non-S2 stream.
 
     Raises InvalidValue on any invalid S2 record (see module docstring). It no longer
@@ -117,5 +138,5 @@ def build_influx_points(envelope, identity, settings):
     to vanish while the message was still ACKed accepted. Callers reject InvalidValue as
     retryable, so no data is lost and nothing is falsely accepted."""
     if getattr(envelope, "stream", None) == "S2":
-        return _s2_points(envelope, identity, settings)
+        return _s2_points(envelope, identity, settings, t3_signal_keys, resolve_point_id)
     return []
