@@ -12,8 +12,9 @@ from src.tenancy.bess_units import models as _bess_units
 from src.tenancy.gateways import models as _gateways  
 from src.tenancy.organizations import models as _organizations  
 from src.tenancy.sites import models as _sites  
-from src.auth import models as _auth  
-from src.rbac import models as _rbac  
+from src.auth import models as _auth
+from src.rbac import models as _rbac
+from src.financials import models as _financials
 
 config = context.config
 if config.config_file_name is not None:

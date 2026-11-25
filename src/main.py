@@ -19,6 +19,7 @@ from src.telemetry.router import router as telemetry_router
 from src.fast_bess.router import router as fast_bess_router
 from src.structured_reads.router import router as structured_reads_router
 from src.monitor.router import router as monitor_router
+from src.financials.router import router as financials_router
 from src.config import get_settings, resolve_cors_origins
 from src.database import engine
 from src.influx import InfluxGateway
@@ -131,6 +132,7 @@ def create_app() -> FastAPI:
     app.include_router(fast_bess_router) # mounts /api/v1/bess/fast/* (S1 reads; PostgreSQL)
     app.include_router(structured_reads_router) # S3-S9 reads (health/alarms/controller/solis/edge-ai/config-audit/commands)
     app.include_router(monitor_router)   # mounts /api/v1/monitor/* (read-only dashboard aggregates)
+    app.include_router(financials_router) # mounts /api/v1/financials/* (revenue tariff config + ToD templates)
     add_cors(app, get_settings())
     return app
 

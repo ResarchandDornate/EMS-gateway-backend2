@@ -18,6 +18,7 @@ from sqlalchemy.dialects.postgresql import insert as pg_insert
 
 from src.ingestion.stream_models import StreamRecordModel
 from src.ingestion.health_service import StoreNotConfirmed
+from src.ingestion import latest_writethrough
 from src.ingestion.generic_stream import GenericStreamEnvelopeIn
 from src.ingestion.s3_health import parse_record_timestamp
 from src.ingestion.dead_letter_service import record_dead_letter
@@ -255,6 +256,10 @@ async def persist_influx_only(session, *, gw, identity: dict,
         # In-request, bounded, idempotent recovery of transient write failures (forward-only;
         # never touches historical/pending rows). On exhaustion it re-raises -> retryable reject.
         await _write_s2_with_retry(influx, influx_points, envelope=envelope, gw=gw)
+        try:
+            await latest_writethrough.write_latest(identity, envelope)   # best-effort snapshot cache
+        except Exception:
+            pass
     stored = await mark_stored(session, gateway_id=gw.id,
                                message_id=envelope.message_id, token=token)
     if not stored:
@@ -334,4 +339,8 @@ async def persist_influx_batch(session, *, gw, identity: dict, items, influx) ->
             _log.warning("s2_store_not_confirmed", message_id=str(envelope.message_id),
                          gateway_id=str(gw.id), stream="S2", retryable=True)
         results[envelope.message_id] = "stored" if stored else "not_confirmed"
+        try:
+            await latest_writethrough.write_latest(identity, envelope)   # best-effort snapshot cache
+        except Exception:
+            pass
     return results

@@ -3,12 +3,15 @@ import uuid
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 
 from src.influx import _ident, bucket_for, measurement_for, rows
+from src.telemetry import snapshot_cache
+from src.ingestion import latest_writethrough
 from src.signals.types import QUALITY_SUFFIX
 from src.signals.types import field_type
 from src.telemetry import service as svc
 from src.telemetry.dependencies import require_site_read
 from src.telemetry.providers import get_influx_gateway_read, get_registry_index_read
-from src.telemetry.schemas import (LatestPoint, LatestResponse, SeriesPoint, SeriesResponse, AggregateResponse)
+from src.telemetry.schemas import (LatestPoint, LatestResponse, SeriesPoint, SeriesResponse, AggregateResponse,
+                                   SnapshotPoint, SnapshotResponse)
 from src.telemetry_errors import (AmbiguousPointId, InfluxTelemetryError, InvalidTimestamp,
                                    RetentionNotConfigured, UnknownPointId, UnknownRetentionClass,
                                    UnknownSignal, UnsafeQueryInput, UnsupportedDataType)
@@ -96,6 +99,73 @@ async def latest(
                for r in recs if r["field"] == signal_key]
     return LatestResponse(site_id=site_id, stream=stream, substream=substream,
                           signal_key=signal_key, results=results)
+
+
+@router.get("/snapshot", response_model=SnapshotResponse)
+async def snapshot(
+    stream: str = Query(...),
+    substream: str = Query(...),
+    site_id: uuid.UUID = Depends(require_site_read),
+    index=Depends(get_registry_index_read),
+    influx=Depends(get_influx_gateway_read),
+):
+    """Bulk latest for one (stream, substream): every signal's newest value in a
+    few Influx queries instead of one /latest call per signal. Read-only, additive."""
+    import asyncio
+
+    measurement = measurement_for(stream, substream)
+    site = str(site_id)
+
+    _wt = await latest_writethrough.read_latest(site, substream)
+    if _wt:
+        return SnapshotResponse(site_id=site_id, stream=stream, substream=substream,
+                                results=[SnapshotPoint(asset_id=a, source_id=s, signal_key=sig,
+                                                       value=v, time=t, quality=q)
+                                         for (a, s, sig, v, q, t) in _wt])
+
+    _cached = await snapshot_cache.get_cached(site, stream, substream)
+    if _cached is not None:
+        return SnapshotResponse(site_id=site_id, stream=stream, substream=substream,
+                                results=[SnapshotPoint(**_p) for _p in _cached])
+
+    plan = index.keys_by_bucket(measurement, influx.settings)   # {bucket: [signal_key, ...]}
+
+    BATCH = 400                     # keep each field-filtered query small
+    sem = asyncio.Semaphore(4)      # bound Influx concurrency (OOM safety)
+
+    async def _query(bucket, keys):
+        async with sem:
+            try:
+                return rows(await influx.latest_snapshot(bucket, measurement, site, keys))
+            except Exception:
+                return []   # one slow/empty batch must not sink the whole snapshot
+
+    tasks = []
+    for bucket, keys in plan.items():
+        for i in range(0, len(keys), BATCH):
+            tasks.append(_query(bucket, keys[i:i + BATCH]))
+
+    best: dict = {}
+    for recs in await asyncio.gather(*tasks):
+        for r in recs:
+            k = (r["asset_id"], r["source_id"], r["field"])
+            cur = best.get(k)
+            if cur is None or str(r["time"] or "") > str(cur["time"] or ""):
+                best[k] = r
+    qsuf = QUALITY_SUFFIX
+    quality_by = {(r["asset_id"], r["source_id"], r["field"][: -len(qsuf)]): r["value"]
+                  for r in best.values()
+                  if isinstance(r["field"], str) and r["field"].endswith(qsuf)}
+    results = [SnapshotPoint(asset_id=r["asset_id"], source_id=r["source_id"],
+                             signal_key=r["field"], value=r["value"], time=r["time"],
+                             quality=quality_by.get((r["asset_id"], r["source_id"], r["field"])))
+               for r in best.values()
+               if isinstance(r["field"], str) and not r["field"].endswith(qsuf)]
+    await snapshot_cache.set_cached(site, stream, substream, [
+        {"asset_id": p.asset_id, "source_id": p.source_id, "signal_key": p.signal_key,
+         "value": p.value, "time": p.time.isoformat() if p.time else None,
+         "quality": p.quality} for p in results])
+    return SnapshotResponse(site_id=site_id, stream=stream, substream=substream, results=results)
 
 
 @router.get("/series", response_model=SeriesResponse)

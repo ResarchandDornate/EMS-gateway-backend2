@@ -167,6 +167,21 @@ class RegistryIndex:
             self._t3_cache = t3
         return t3
 
+    def keys_by_bucket(self, measurement: str, settings) -> dict:
+        """Group a measurement's signal_keys by the Influx bucket that holds them
+        (via each signal's retention_class). Lets the bulk snapshot query only the
+        bucket(s) that actually hold this substream, with only its fields."""
+        out: dict = {}
+        for (m, sk), sig in self._by_key.items():
+            if m != measurement:
+                continue
+            try:
+                b = bucket_for(sig.retention_class, settings)
+            except Exception:
+                continue
+            out.setdefault(b, []).append(sk)
+        return out
+
     def __len__(self) -> int:
         return len(self._by_key)
 
@@ -333,6 +348,30 @@ class InfluxGateway:
             f'  |> range(start: {start})\n'
             f'  |> filter(fn: (r) => r._measurement == "{measurement}" '
             f'and r.site_id == "{site_id}" and (r._field == "{signal_key}" or r._field == "{signal_key}{QUALITY_SUFFIX}"){extra})\n'
+            f'  |> group(columns: ["asset_id", "source_id", "_field"])\n'
+            f'  |> last()'
+        )
+        return await self.query(flux)
+
+    async def latest_snapshot(self, bucket, measurement, site_id, signal_keys, start="-10m"):
+        """Bulk latest for a set of signals in one (measurement, site): same shape and
+        field-seek as latest_by_asset, but many signal_keys at once instead of one.
+        The explicit field predicate lets Influx seek just those field-series (fast),
+        unlike an unfiltered measurement scan. Read-only."""
+        _ident("bucket", bucket); _ident("measurement", measurement); _ident("site_id", site_id); _range(start)
+        if not signal_keys:
+            return []
+        preds = []
+        for k in signal_keys:
+            kk = _ident("signal_key", k)
+            preds.append(f'r._field == "{kk}"')
+            preds.append(f'r._field == "{kk}{QUALITY_SUFFIX}"')
+        fieldfilter = " or ".join(preds)
+        flux = (
+            f'from(bucket: "{bucket}")\n'
+            f'  |> range(start: {start})\n'
+            f'  |> filter(fn: (r) => r._measurement == "{measurement}" '
+            f'and r.site_id == "{site_id}" and ({fieldfilter}))\n'
             f'  |> group(columns: ["asset_id", "source_id", "_field"])\n'
             f'  |> last()'
         )
