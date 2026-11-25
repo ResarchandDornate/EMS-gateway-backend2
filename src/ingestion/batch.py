@@ -38,6 +38,9 @@ LEGACY_STREAM_MAP = {
 # 12 fields) so it is now ingested like any other S2 substream.
 EXCLUDED_SUBSTREAMS = frozenset()
 
+# S10 substreams that override the fixed pair_controller (CG-28 automation uplink).
+S10_AUTOMATION_SUBSTREAMS = frozenset({"automation_status", "automation_events"})
+
 # Upper bound on messages per batch (body size is already capped in body.decode_body).
 MAX_BATCH_MESSAGES = 10_000
 
@@ -86,10 +89,15 @@ def adapt_batch_message(msg, identity: dict) -> dict:
         )
     code, fixed_sub = LEGACY_STREAM_MAP[raw_stream]
 
-    if fixed_sub is not None:
+    msg_sub = msg.get("substream")
+    # CG-28: battery_charge_discharge_control also carries the automation substreams, which
+    # override the fixed pair_controller when the message names one of them.
+    if code == "S10" and msg_sub in S10_AUTOMATION_SUBSTREAMS:
+        substream = msg_sub
+    elif fixed_sub is not None:
         substream = fixed_sub
     else:
-        substream = msg.get("substream")                      # S2: per-message substream
+        substream = msg_sub                                   # S2: per-message substream
         if not isinstance(substream, str) or not substream:
             raise BatchMessageError(422, "batch message missing 'substream'", message_id=mid)
     if substream in EXCLUDED_SUBSTREAMS:

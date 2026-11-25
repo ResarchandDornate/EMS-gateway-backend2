@@ -18,6 +18,7 @@ from src.ingestion.command_result_models import CommandResultRecordModel
 from src.ingestion.health_service import StoreNotConfirmed
 from src.ingestion.s3_health import parse_record_timestamp
 from src.ingestion.s9_command_results import S9CommandEnvelopeIn
+from src.commands.service import apply_results
 from src.ingestion.service import (IngestDecision, canonical_hash, claim_or_resolve,
                                    mark_stored)
 
@@ -87,4 +88,7 @@ async def persist_command_result(session, *, gw, identity: dict,
                                message_id=envelope.message_id, token=token)
     if not stored:
         raise StoreNotConfirmed("store not confirmed; retry")
+
+    # CG-27: let each result close its pending command (no-op if none is waiting).
+    await apply_results(session, gateway_id=gw.id, records=envelope.records)
     return decision

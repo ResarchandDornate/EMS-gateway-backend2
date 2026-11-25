@@ -117,6 +117,35 @@ class CommandOut(BaseModel):             # S9
     payload: Any
 
 
+class AutomationStatusOut(BaseModel):     # S10 automation_status (CG-28)
+    model_config = _C
+    gateway_id: uuid.UUID
+    site_id: uuid.UUID
+    automation_enabled: bool | None
+    config_revision: int | None
+    supervisor_alive: bool | None
+    phase: str | None
+    direction: str | None
+    fault_latched: bool | None
+    safe_stop_requested: bool | None
+    sample_time_utc: datetime | None
+    received_at_utc: datetime
+    payload: Any
+
+
+class AutomationEventOut(BaseModel):      # S10 automation_events (CG-28)
+    model_config = _C
+    gateway_id: uuid.UUID
+    site_id: uuid.UUID
+    event_id: str
+    event_type: str | None
+    phase: str | None
+    direction: str | None
+    timestamp_utc: datetime | None
+    received_at_utc: datetime
+    payload: Any
+
+
 class ChargeDischargeOut(BaseModel):     # S10
     model_config = _C
     gateway_id: uuid.UUID

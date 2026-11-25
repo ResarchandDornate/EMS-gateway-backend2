@@ -16,6 +16,7 @@ from src.ingestion.charge_discharge_models import ChargeDischargeRecordModel
 from src.ingestion.health_service import StoreNotConfirmed
 from src.ingestion.s3_health import parse_record_timestamp
 from src.ingestion.s10_charge_discharge import S10ChargeDischargeEnvelopeIn
+from src.ingestion.automation_service import persist_automation_status, persist_automation_events
 from src.ingestion.service import (IngestDecision, canonical_hash, claim_or_resolve,
                                    mark_stored)
 
@@ -82,7 +83,16 @@ async def _upsert_rows(session, rows: list[dict]) -> None:
 async def persist_charge_discharge(session, *, gw, identity: dict,
                                    envelope: S10ChargeDischargeEnvelopeIn) -> IngestDecision:
     """Full S10 charge/discharge pair-status persist. Returns the ledger IngestDecision. Mirrors
-    the S5/S6 phase order: validate -> hash -> claim -> write -> mark_stored."""
+    the S5/S6 phase order: validate -> hash -> claim -> write -> mark_stored.
+
+    S10 carries three substreams. automation_status and automation_events (CG-28) are routed to
+    their own persisters; the default is the pair_controller status path below, unchanged."""
+    sub = getattr(envelope, "substream", None)
+    if sub == "automation_status":
+        return await persist_automation_status(session, gw=gw, identity=identity, envelope=envelope)
+    if sub == "automation_events":
+        return await persist_automation_events(session, gw=gw, identity=identity, envelope=envelope)
+
     rows = _build_rows(gw.id, identity, envelope)                      # validate-before-claim
     payload_hash = canonical_hash(envelope.model_dump(mode="json"))
 

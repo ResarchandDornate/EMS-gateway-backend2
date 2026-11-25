@@ -15,6 +15,8 @@ from src.tenancy.sites import models as _sites
 from src.auth import models as _auth
 from src.rbac import models as _rbac
 from src.financials import models as _financials
+from src.ingestion import automation_models as _automation
+from src.commands import models as _commands
 
 config = context.config
 if config.config_file_name is not None:

@@ -22,6 +22,8 @@ from src.ingestion.solis_models import SolisTelemetryRecordModel as S6M
 from src.ingestion.edge_ai_models import EdgeAiInferenceRecordModel as S7M
 from src.ingestion.config_audit_models import ConfigurationAuditRecordModel as S8M
 from src.ingestion.command_result_models import CommandResultRecordModel as S9M
+from src.ingestion.automation_models import (AutomationStatusRecordModel as AStatusM,
+                                             AutomationEventRecordModel as AEventM)
 from src.ingestion.alarm_catalog_models import AlarmCatalogModel
 from src.structured_reads import ranges, schemas as S
 from src.structured_reads.summary import summarize
@@ -363,3 +365,35 @@ async def charge_discharge_history(gateway_id: uuid.UUID | None = Query(None),
                       (S10M.run_status, run_status), (S10M.direction, direction))
     rows, more = await _page(session, stmt, limit, offset)
     return _resp(site_id, rows, more, limit, offset, S.ChargeDischargeOut)
+
+
+# ---------------- S10 automation_status / automation_events (CG-28) ----------------
+@router.get("/automation-status/latest")
+async def automation_status_latest(gateway_id: uuid.UUID | None = Query(None),
+                                   limit: int = Query(DEF_LATEST, ge=1, le=MAX_LIMIT),
+                                   site_id: uuid.UUID = Depends(require_site_read),
+                                   session: AsyncSession = Depends(get_session)):
+    """The newest site automation_status record per gateway (automation is site-wide, so one row
+    for a single-gateway site). The frontend derives each pair's mode from active_pairs /
+    prepared_pairs / schedule in the payload."""
+    stmt = _latest_stmt(AStatusM, site_id, AStatusM.received_at_utc,
+                        (AStatusM.gateway_id, gateway_id)).limit(limit)
+    rows = list((await session.execute(stmt)).scalars().all())
+    return _resp(site_id, rows, False, limit, 0, S.AutomationStatusOut)
+
+
+@router.get("/automation-events")
+async def automation_events(gateway_id: uuid.UUID | None = Query(None),
+                            event_type: str | None = Query(None),
+                            start: str | None = Query(None), stop: str | None = Query(None),
+                            range_: str | None = Query(None, alias="range"),
+                            sort: str = Query("desc", pattern="^(asc|desc)$"),
+                            limit: int = Query(DEF_HIST, ge=1, le=MAX_LIMIT), offset: int = Query(0, ge=0),
+                            site_id: uuid.UUID = Depends(require_site_read),
+                            session: AsyncSession = Depends(get_session)):
+    """The automation events feed (de-duplicated on event_id at ingest)."""
+    start_dt, stop_dt = _window(start, stop, range_)
+    stmt = _hist_stmt(AEventM, site_id, AEventM.received_at_utc, start_dt, stop_dt, sort,
+                      (AEventM.gateway_id, gateway_id), (AEventM.event_type, event_type))
+    rows, more = await _page(session, stmt, limit, offset)
+    return _resp(site_id, rows, more, limit, offset, S.AutomationEventOut)
