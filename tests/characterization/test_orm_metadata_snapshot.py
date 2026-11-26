@@ -84,6 +84,8 @@ GOLDEN: dict[str, tuple[str, ...]] = {
     "organizations": ("created_at", "id", "is_active", "is_deleted", "name", "org_key", "status", "updated_at"),
     "otp_challenges": ("attempts", "channel", "consumed_at", "created_at", "destination", "expires_at", "id",
                        "is_active", "is_deleted", "otp_hash", "updated_at", "user_id"),
+    "automation_configs": ("config", "created_at", "enabled", "gateway_id", "id", "is_active",
+                           "is_deleted", "updated_at", "updated_by"),
     "pending_commands": ("arguments", "closed_at_utc", "command_id", "command_type",
                          "correlation_id", "created_at", "expires_at_utc", "final_status",
                          "gateway_error_code", "gateway_id", "id", "is_active", "is_deleted",

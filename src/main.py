@@ -21,6 +21,7 @@ from src.structured_reads.router import router as structured_reads_router
 from src.monitor.router import router as monitor_router
 from src.financials.router import router as financials_router
 from src.site_profile.router import router as site_profile_router
+from src.automation_config.router import router as automation_config_router
 from src.commands.router import router as commands_router
 from src.config import get_settings, resolve_cors_origins
 from src.database import engine
@@ -136,6 +137,7 @@ def create_app() -> FastAPI:
     app.include_router(monitor_router)   # mounts /api/v1/monitor/* (read-only dashboard aggregates)
     app.include_router(financials_router) # mounts /api/v1/financials/* (revenue tariff config + ToD templates)
     app.include_router(site_profile_router) # mounts /api/v1/site-profiles/* (super-admin site registration)
+    app.include_router(automation_config_router) # mounts /api/v1/automation-config (scheduled automation editor)
     app.include_router(commands_router)   # mounts /api/v1/commands (D1 downlink: UI create + gateway poll)
     add_cors(app, get_settings())
     return app
