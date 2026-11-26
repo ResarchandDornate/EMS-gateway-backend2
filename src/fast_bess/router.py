@@ -15,7 +15,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from src.database import get_session
 from src.fast_bess import service as svc
 from src.fast_bess.schemas import (FastBessHistoryResponse, FastBessLatestResponse,
-                                    FastBessRecord)
+                                    FastBessRecord, FastBessSlicesRequest, FastBessSlicesResponse)
 from src.telemetry.dependencies import require_site_read
 from src.structured_reads.ranges import RangeError, resolve_range
 
@@ -24,6 +24,7 @@ router = APIRouter(prefix="/api/v1/bess/fast", tags=["bess-fast"])
 MAX_LIMIT = 1000
 DEFAULT_LATEST_LIMIT = 200
 DEFAULT_HISTORY_LIMIT = 500
+MAX_SLICE_WINDOWS = 500
 
 
 def _parse_ts(name: str, value: str | None) -> datetime | None:
@@ -81,3 +82,26 @@ async def history(
                                        start=start_dt, stop=stop_dt, limit=limit, offset=offset)
     return FastBessHistoryResponse(site_id=site_id, limit=limit, offset=offset,
                                    has_more=has_more, results=[_dto(r) for r in rows])
+
+
+@router.post("/slices", response_model=FastBessSlicesResponse)
+async def slices(
+    body: FastBessSlicesRequest,
+    site_id: uuid.UUID = Depends(require_site_read),      # 401/403 + authorized site
+    session: AsyncSession = Depends(get_session),
+):
+    """The newest record in each requested window, in one query. Replaces the N separate
+    limit=1 reads the dashboard's thinned history used to make — same records, one round trip."""
+    if len(body.windows) > MAX_SLICE_WINDOWS:
+        raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT,
+                            f"too many windows (max {MAX_SLICE_WINDOWS})")
+    wins = []
+    for a, b in body.windows:
+        if b <= a:
+            raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT, "each window needs from < to")
+        wins.append((datetime.fromtimestamp(a / 1000, tz=timezone.utc),
+                     datetime.fromtimestamp(b / 1000, tz=timezone.utc)))
+    recs = await svc.slices(session, site_id=site_id, windows=wins,
+                            gateway_id=body.gateway_id, source_id=body.source_id, bess_id=body.bess_id)
+    return FastBessSlicesResponse(site_id=site_id,
+                                  results=[[_dto(r)] if r is not None else [] for r in recs])

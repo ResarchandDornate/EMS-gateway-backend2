@@ -28,3 +28,18 @@ class FastBessHistoryResponse(BaseModel):
     offset: int
     has_more: bool
     results: list[FastBessRecord]
+
+
+class FastBessSlicesRequest(BaseModel):
+    """Many one-sample reads in one request: the newest record in each [from_ms, to_ms) window.
+    Windows are epoch-ms pairs, as the dashboard's thinned history builds them."""
+    bess_id: str | None = None
+    gateway_id: uuid.UUID | None = None
+    source_id: str | None = None
+    windows: list[tuple[int, int]]
+
+
+class FastBessSlicesResponse(BaseModel):
+    site_id: uuid.UUID
+    # One entry per input window, in order: the window's newest record, or [] when it has none.
+    results: list[list[FastBessRecord]]
