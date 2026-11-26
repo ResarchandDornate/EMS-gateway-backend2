@@ -84,4 +84,4 @@ def test_t5a_nine_rows_still_T2_1Y():
 
 
 def test_row_count_unchanged():
-    assert len(_rows()) == 3456  # data rows (3457 lines incl header)
+    assert len(_rows()) == 3518  # 3456 + 62 Kalpa SECURE meter rows (solar_meter 31 + load_meter 31)

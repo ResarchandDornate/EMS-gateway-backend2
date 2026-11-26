@@ -205,7 +205,7 @@ def test_real_seed_builds_and_routes():
     # Regression tripwire on the documented per-stream totals (one source of truth).
     s1_rows = sum(1 for ps, *_ in rows if ps == "S1")
     s2_rows = sum(1 for ps, *_ in rows if ps == "S2")
-    assert (s1_rows, s2_rows) == (55, 3401)  # +Phase F-1 fire DIs di4h, di13h
+    assert (s1_rows, s2_rows) == (55, 3463)  # +Kalpa SECURE meters solar_meter/load_meter
     # S1 -> raw, S2 T2 -> long, real T3 -> 3y
     from src.ingestion.mapping import build_message_points
     id2 = {"organization_id": "org1", "site_id": "site1", "gateway_id": "gw1"}

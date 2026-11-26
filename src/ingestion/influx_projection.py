@@ -40,6 +40,17 @@ ENERGY_T3_SIGNALS = frozenset({
     "rack_accumulated_charge_energy", "rack_accumulated_discharge_energy",
 })
 
+# Signal-namespaced SECURE meter metadata (S2.11 solar_meter / S2.12 load_meter). Each is written
+# as <signal_key><suffix> so multiple signals that share one (measurement, tag-set, timestamp)
+# NEVER collide on a field key -- the same collision-safe discipline as QUALITY_SUFFIX. Absent on
+# every non-SECURE record, so existing CleanEdge series are byte-identical.
+_SECURE_FIELD_SUFFIXES = (
+    ("runtime_signal_id", "_rsid"),
+    ("observed_at_utc", "_obs_utc"),
+    ("source_updated_utc", "_src_utc"),
+    ("source_data_age_ms", "_age_ms"),
+)
+
 
 def _field(v):
     """Native Influx field value, or None to skip this signal."""
@@ -67,8 +78,12 @@ def _ts(*candidates):
     return None
 
 
-def _point(meas, tags: dict, signal_key, fv, quality, dt):
-    """Build a Point from an ALREADY-VALIDATED field value `fv` (never None) and `dt`."""
+def _point(meas, tags: dict, signal_key, fv, quality, dt, extra_fields=None):
+    """Build a Point from an ALREADY-VALIDATED field value `fv` (never None) and `dt`.
+
+    extra_fields: optional {field_key: value} of signal-namespaced SECURE metadata. Keys are
+    already <signal_key><suffix>, so they never clash with another signal's value at the same
+    timestamp. None/empty for every non-SECURE record -> identical output to before."""
     pt = Point(meas)
     for k, val in tags.items():
         if val:
@@ -76,6 +91,10 @@ def _point(meas, tags: dict, signal_key, fv, quality, dt):
     pt = pt.field(signal_key, fv)
     if isinstance(quality, str) and quality:
         pt = pt.field(f"{signal_key}{QUALITY_SUFFIX}", quality)
+    for k, v in (extra_fields or {}).items():
+        ev = _field(v)
+        if ev is not None:
+            pt = pt.field(k, ev)
     return pt.time(dt)
 
 
@@ -105,7 +124,10 @@ def _s2_points(envelope, identity, settings, t3_signal_keys=None, resolve_point_
         if dt is None:
             raise InvalidValue(f"S2 signal {signal!r} has no parseable timestamp")
         tags = {**base, "source_id": rec.get("source_id"),
-                "asset_id": rec.get("runtime_asset_id") or rec.get("base_asset_id")}
+                "asset_id": rec.get("runtime_asset_id") or rec.get("base_asset_id"),
+                # SECURE meter dimensions; None on every non-SECURE record -> tag omitted by _point.
+                "base_asset_id": rec.get("base_asset_id"),
+                "meter_role": rec.get("meter_role")}
         pid = rec.get("point_id")
         if (getattr(settings, "s2_point_id_tag_enabled", True) and isinstance(pid, str)
                 and pid.strip() and resolve_point_id is not None):
@@ -123,10 +145,19 @@ def _s2_points(envelope, identity, settings, t3_signal_keys=None, resolve_point_
                 r_meas = r_key = None
             if r_meas == meas and r_key == signal:
                 tags["point_id"] = pid_s
+        # Signal-namespaced metadata (collision-safe): each co-timestamped signal keeps its own.
+        # SCOPED to SECURE meter records via meter_role -- a CleanEdge S2 record has no meter_role,
+        # so it gets NO new fields and its series stay byte-identical.
+        extra = {}
+        if rec.get("meter_role") is not None:
+            for src_key, suffix in _SECURE_FIELD_SUFFIXES:
+                v = rec.get(src_key)
+                if v is not None:
+                    extra[f"{signal}{suffix}"] = v
         t3 = ENERGY_T3_SIGNALS if t3_signal_keys is None else t3_signal_keys
         bucket = (settings.influx_bucket_3y if signal in t3
                   else settings.influx_bucket_long)
-        out.append((bucket, _point(meas, tags, signal, fv, rec.get("quality"), dt)))
+        out.append((bucket, _point(meas, tags, signal, fv, rec.get("quality"), dt, extra)))
     return out
 
 

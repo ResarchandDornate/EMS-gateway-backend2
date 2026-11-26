@@ -3455,3 +3455,65 @@ environment.hvac.high_humidity_setpoint,cleanhedge,S2,io_module,bms_environment,
 environment.fire.fire_alarm_level_1,cleanhedge,S2,fire_protection,bms_environment,di6h,Fire Alarm Level 1 (DI6),,fire_protection,U16,ON_CHANGE_HEARTBEAT,300,,STATE,T2_1Y,false,r,telemetry.environment.di6h,DATA S2.6 Fire Protection:row22
 ,cleanhedge,S2,fire_protection,bms_environment,di4h,Fire Alarm Level 2 (DI4),,fire_protection,U16,ON_CHANGE_HEARTBEAT,60,,STATE,T2_1Y,false,r,telemetry.environment.di4h,DATA S2.6 Fire Protection:row21
 ,cleanhedge,S2,fire_protection,bms_environment,di13h,Fire Spray FBK (DI13),,fire_protection,U16,PERIODIC,60,,STATE,T2_1Y,false,r,telemetry.environment.di13h,DATA S2.6 Fire Protection:row23
+,cleanhedge,S2,solar_meter,energy_meter,voltage_a_v,Voltage A,V,meter,FLOAT32,PERIODIC,30,,Meter measurement,T2_1Y,false,r,meter.measurement.voltage_a_v,DATA S2.11 Solar Meter:reg99
+,cleanhedge,S2,solar_meter,energy_meter,voltage_b_v,Voltage B,V,meter,FLOAT32,PERIODIC,30,,Meter measurement,T2_1Y,false,r,meter.measurement.voltage_b_v,DATA S2.11 Solar Meter:reg101
+,cleanhedge,S2,solar_meter,energy_meter,voltage_c_v,Voltage C,V,meter,FLOAT32,PERIODIC,30,,Meter measurement,T2_1Y,false,r,meter.measurement.voltage_c_v,DATA S2.11 Solar Meter:reg103
+,cleanhedge,S2,solar_meter,energy_meter,voltage_average_v,Voltage Average,V,meter,FLOAT32,PERIODIC,30,,Meter measurement,T2_1Y,false,r,meter.measurement.voltage_average_v,DATA S2.11 Solar Meter:reg105
+,cleanhedge,S2,solar_meter,energy_meter,voltage_ab_v,Voltage AB,V,meter,FLOAT32,PERIODIC,30,,Meter measurement,T2_1Y,false,r,meter.measurement.voltage_ab_v,DATA S2.11 Solar Meter:reg107
+,cleanhedge,S2,solar_meter,energy_meter,voltage_bc_v,Voltage BC,V,meter,FLOAT32,PERIODIC,30,,Meter measurement,T2_1Y,false,r,meter.measurement.voltage_bc_v,DATA S2.11 Solar Meter:reg109
+,cleanhedge,S2,solar_meter,energy_meter,voltage_ca_v,Voltage CA,V,meter,FLOAT32,PERIODIC,30,,Meter measurement,T2_1Y,false,r,meter.measurement.voltage_ca_v,DATA S2.11 Solar Meter:reg111
+,cleanhedge,S2,solar_meter,energy_meter,current_a_a,Current A,A,meter,FLOAT32,PERIODIC,30,,Meter measurement,T2_1Y,false,r,meter.measurement.current_a_a,DATA S2.11 Solar Meter:reg113
+,cleanhedge,S2,solar_meter,energy_meter,current_b_a,Current B,A,meter,FLOAT32,PERIODIC,30,,Meter measurement,T2_1Y,false,r,meter.measurement.current_b_a,DATA S2.11 Solar Meter:reg115
+,cleanhedge,S2,solar_meter,energy_meter,current_c_a,Current C,A,meter,FLOAT32,PERIODIC,30,,Meter measurement,T2_1Y,false,r,meter.measurement.current_c_a,DATA S2.11 Solar Meter:reg117
+,cleanhedge,S2,solar_meter,energy_meter,current_neutral_a,Current Neutral,A,meter,FLOAT32,PERIODIC,30,,Meter measurement,T2_1Y,false,r,meter.measurement.current_neutral_a,DATA S2.11 Solar Meter:reg119
+,cleanhedge,S2,solar_meter,energy_meter,power_factor_a,Power Factor,,meter,FLOAT32,PERIODIC,30,,Meter measurement,T2_1Y,false,r,meter.measurement.power_factor_a,DATA S2.11 Solar Meter:reg133
+,cleanhedge,S2,solar_meter,energy_meter,power_factor_b,Power Factor B,,meter,FLOAT32,PERIODIC,30,,Meter measurement,T2_1Y,false,r,meter.measurement.power_factor_b,DATA S2.11 Solar Meter:reg135
+,cleanhedge,S2,solar_meter,energy_meter,power_factor_c,Power Factor C,,meter,FLOAT32,PERIODIC,30,,Meter measurement,T2_1Y,false,r,meter.measurement.power_factor_c,DATA S2.11 Solar Meter:reg137
+,cleanhedge,S2,solar_meter,energy_meter,power_factor_total,Power Factor Total,,meter,FLOAT32,PERIODIC,30,,Meter measurement,T2_1Y,false,r,meter.measurement.power_factor_total,DATA S2.11 Solar Meter:reg139
+,cleanhedge,S2,solar_meter,energy_meter,active_power_a_kw,Active Power A,kW,meter,FLOAT32,PERIODIC,30,,Meter measurement,T2_1Y,false,r,meter.measurement.active_power_a_kw,DATA S2.11 Solar Meter:reg141
+,cleanhedge,S2,solar_meter,energy_meter,active_power_b_kw,Active Power B,kW,meter,FLOAT32,PERIODIC,30,,Meter measurement,T2_1Y,false,r,meter.measurement.active_power_b_kw,DATA S2.11 Solar Meter:reg143
+,cleanhedge,S2,solar_meter,energy_meter,active_power_c_kw,Active Power C,kW,meter,FLOAT32,PERIODIC,30,,Meter measurement,T2_1Y,false,r,meter.measurement.active_power_c_kw,DATA S2.11 Solar Meter:reg145
+,cleanhedge,S2,solar_meter,energy_meter,active_power_total_kw,Active Power Total,kW,meter,FLOAT32,PERIODIC,5,,Meter measurement,T2_1Y,false,r,meter.measurement.active_power_total_kw,DATA S2.11 Solar Meter:reg147
+,cleanhedge,S2,solar_meter,energy_meter,reactive_power_a_kvar,Reactive Power A,kvar,meter,FLOAT32,PERIODIC,30,,Meter measurement,T2_1Y,false,r,meter.measurement.reactive_power_a_kvar,DATA S2.11 Solar Meter:reg149
+,cleanhedge,S2,solar_meter,energy_meter,reactive_power_b_kvar,Reactive Power B,kvar,meter,FLOAT32,PERIODIC,30,,Meter measurement,T2_1Y,false,r,meter.measurement.reactive_power_b_kvar,DATA S2.11 Solar Meter:reg151
+,cleanhedge,S2,solar_meter,energy_meter,reactive_power_c_kvar,Reactive Power C,kvar,meter,FLOAT32,PERIODIC,30,,Meter measurement,T2_1Y,false,r,meter.measurement.reactive_power_c_kvar,DATA S2.11 Solar Meter:reg153
+,cleanhedge,S2,solar_meter,energy_meter,reactive_power_total_kvar,Reactive Power Total,kvar,meter,FLOAT32,PERIODIC,30,,Meter measurement,T2_1Y,false,r,meter.measurement.reactive_power_total_kvar,DATA S2.11 Solar Meter:reg155
+,cleanhedge,S2,solar_meter,energy_meter,apparent_power_a_kva,Apparent Power A,kVA,meter,FLOAT32,PERIODIC,30,,Meter measurement,T2_1Y,false,r,meter.measurement.apparent_power_a_kva,DATA S2.11 Solar Meter:reg157
+,cleanhedge,S2,solar_meter,energy_meter,apparent_power_b_kva,Apparent Power B,kVA,meter,FLOAT32,PERIODIC,30,,Meter measurement,T2_1Y,false,r,meter.measurement.apparent_power_b_kva,DATA S2.11 Solar Meter:reg159
+,cleanhedge,S2,solar_meter,energy_meter,apparent_power_c_kva,Apparent Power C,kVA,meter,FLOAT32,PERIODIC,30,,Meter measurement,T2_1Y,false,r,meter.measurement.apparent_power_c_kva,DATA S2.11 Solar Meter:reg161
+,cleanhedge,S2,solar_meter,energy_meter,apparent_power_total_kva,Apparent Power Total,kVA,meter,FLOAT32,PERIODIC,30,,Meter measurement,T2_1Y,false,r,meter.measurement.apparent_power_total_kva,DATA S2.11 Solar Meter:reg163
+,cleanhedge,S2,solar_meter,energy_meter,frequency_hz,Frequency,Hz,meter,FLOAT32,PERIODIC,30,,Meter measurement,T2_1Y,false,r,meter.measurement.frequency_hz,DATA S2.11 Solar Meter:reg171
+,cleanhedge,S2,solar_meter,energy_meter,active_energy_import_kwh,Active Energy Import,kWh,meter,FLOAT32,PERIODIC,60,,Meter active energy,T3_3Y,false,r,meter.energy.active_energy_import_kwh,DATA S2.11 Solar Meter:reg199
+,cleanhedge,S2,solar_meter,energy_meter,active_energy_export_kwh,Active Energy Export,kWh,meter,FLOAT32,PERIODIC,60,,Meter active energy,T3_3Y,false,r,meter.energy.active_energy_export_kwh,DATA S2.11 Solar Meter:reg201
+,cleanhedge,S2,solar_meter,energy_meter,active_energy_net_kwh,Active Energy Net,kWh,meter,FLOAT32,PERIODIC,60,,Meter active energy,T3_3Y,false,r,meter.energy.active_energy_net_kwh,DATA S2.11 Solar Meter:reg203
+,cleanhedge,S2,load_meter,energy_meter,voltage_a_v,Voltage A,V,meter,FLOAT32,PERIODIC,30,,Meter measurement,T2_1Y,false,r,meter.measurement.voltage_a_v,DATA S2.12 Load Meter:reg99
+,cleanhedge,S2,load_meter,energy_meter,voltage_b_v,Voltage B,V,meter,FLOAT32,PERIODIC,30,,Meter measurement,T2_1Y,false,r,meter.measurement.voltage_b_v,DATA S2.12 Load Meter:reg101
+,cleanhedge,S2,load_meter,energy_meter,voltage_c_v,Voltage C,V,meter,FLOAT32,PERIODIC,30,,Meter measurement,T2_1Y,false,r,meter.measurement.voltage_c_v,DATA S2.12 Load Meter:reg103
+,cleanhedge,S2,load_meter,energy_meter,voltage_average_v,Voltage Average,V,meter,FLOAT32,PERIODIC,30,,Meter measurement,T2_1Y,false,r,meter.measurement.voltage_average_v,DATA S2.12 Load Meter:reg105
+,cleanhedge,S2,load_meter,energy_meter,voltage_ab_v,Voltage AB,V,meter,FLOAT32,PERIODIC,30,,Meter measurement,T2_1Y,false,r,meter.measurement.voltage_ab_v,DATA S2.12 Load Meter:reg107
+,cleanhedge,S2,load_meter,energy_meter,voltage_bc_v,Voltage BC,V,meter,FLOAT32,PERIODIC,30,,Meter measurement,T2_1Y,false,r,meter.measurement.voltage_bc_v,DATA S2.12 Load Meter:reg109
+,cleanhedge,S2,load_meter,energy_meter,voltage_ca_v,Voltage CA,V,meter,FLOAT32,PERIODIC,30,,Meter measurement,T2_1Y,false,r,meter.measurement.voltage_ca_v,DATA S2.12 Load Meter:reg111
+,cleanhedge,S2,load_meter,energy_meter,current_a_a,Current A,A,meter,FLOAT32,PERIODIC,30,,Meter measurement,T2_1Y,false,r,meter.measurement.current_a_a,DATA S2.12 Load Meter:reg113
+,cleanhedge,S2,load_meter,energy_meter,current_b_a,Current B,A,meter,FLOAT32,PERIODIC,30,,Meter measurement,T2_1Y,false,r,meter.measurement.current_b_a,DATA S2.12 Load Meter:reg115
+,cleanhedge,S2,load_meter,energy_meter,current_c_a,Current C,A,meter,FLOAT32,PERIODIC,30,,Meter measurement,T2_1Y,false,r,meter.measurement.current_c_a,DATA S2.12 Load Meter:reg117
+,cleanhedge,S2,load_meter,energy_meter,current_neutral_a,Current Neutral,A,meter,FLOAT32,PERIODIC,30,,Meter measurement,T2_1Y,false,r,meter.measurement.current_neutral_a,DATA S2.12 Load Meter:reg119
+,cleanhedge,S2,load_meter,energy_meter,power_factor_a,Power Factor,,meter,FLOAT32,PERIODIC,30,,Meter measurement,T2_1Y,false,r,meter.measurement.power_factor_a,DATA S2.12 Load Meter:reg133
+,cleanhedge,S2,load_meter,energy_meter,power_factor_b,Power Factor B,,meter,FLOAT32,PERIODIC,30,,Meter measurement,T2_1Y,false,r,meter.measurement.power_factor_b,DATA S2.12 Load Meter:reg135
+,cleanhedge,S2,load_meter,energy_meter,power_factor_c,Power Factor C,,meter,FLOAT32,PERIODIC,30,,Meter measurement,T2_1Y,false,r,meter.measurement.power_factor_c,DATA S2.12 Load Meter:reg137
+,cleanhedge,S2,load_meter,energy_meter,power_factor_total,Power Factor Total,,meter,FLOAT32,PERIODIC,30,,Meter measurement,T2_1Y,false,r,meter.measurement.power_factor_total,DATA S2.12 Load Meter:reg139
+,cleanhedge,S2,load_meter,energy_meter,active_power_a_kw,Active Power A,kW,meter,FLOAT32,PERIODIC,30,,Meter measurement,T2_1Y,false,r,meter.measurement.active_power_a_kw,DATA S2.12 Load Meter:reg141
+,cleanhedge,S2,load_meter,energy_meter,active_power_b_kw,Active Power B,kW,meter,FLOAT32,PERIODIC,30,,Meter measurement,T2_1Y,false,r,meter.measurement.active_power_b_kw,DATA S2.12 Load Meter:reg143
+,cleanhedge,S2,load_meter,energy_meter,active_power_c_kw,Active Power C,kW,meter,FLOAT32,PERIODIC,30,,Meter measurement,T2_1Y,false,r,meter.measurement.active_power_c_kw,DATA S2.12 Load Meter:reg145
+,cleanhedge,S2,load_meter,energy_meter,active_power_total_kw,Active Power Total,kW,meter,FLOAT32,PERIODIC,5,,Meter measurement,T2_1Y,false,r,meter.measurement.active_power_total_kw,DATA S2.12 Load Meter:reg147
+,cleanhedge,S2,load_meter,energy_meter,reactive_power_a_kvar,Reactive Power A,kvar,meter,FLOAT32,PERIODIC,30,,Meter measurement,T2_1Y,false,r,meter.measurement.reactive_power_a_kvar,DATA S2.12 Load Meter:reg149
+,cleanhedge,S2,load_meter,energy_meter,reactive_power_b_kvar,Reactive Power B,kvar,meter,FLOAT32,PERIODIC,30,,Meter measurement,T2_1Y,false,r,meter.measurement.reactive_power_b_kvar,DATA S2.12 Load Meter:reg151
+,cleanhedge,S2,load_meter,energy_meter,reactive_power_c_kvar,Reactive Power C,kvar,meter,FLOAT32,PERIODIC,30,,Meter measurement,T2_1Y,false,r,meter.measurement.reactive_power_c_kvar,DATA S2.12 Load Meter:reg153
+,cleanhedge,S2,load_meter,energy_meter,reactive_power_total_kvar,Reactive Power Total,kvar,meter,FLOAT32,PERIODIC,30,,Meter measurement,T2_1Y,false,r,meter.measurement.reactive_power_total_kvar,DATA S2.12 Load Meter:reg155
+,cleanhedge,S2,load_meter,energy_meter,apparent_power_a_kva,Apparent Power A,kVA,meter,FLOAT32,PERIODIC,30,,Meter measurement,T2_1Y,false,r,meter.measurement.apparent_power_a_kva,DATA S2.12 Load Meter:reg157
+,cleanhedge,S2,load_meter,energy_meter,apparent_power_b_kva,Apparent Power B,kVA,meter,FLOAT32,PERIODIC,30,,Meter measurement,T2_1Y,false,r,meter.measurement.apparent_power_b_kva,DATA S2.12 Load Meter:reg159
+,cleanhedge,S2,load_meter,energy_meter,apparent_power_c_kva,Apparent Power C,kVA,meter,FLOAT32,PERIODIC,30,,Meter measurement,T2_1Y,false,r,meter.measurement.apparent_power_c_kva,DATA S2.12 Load Meter:reg161
+,cleanhedge,S2,load_meter,energy_meter,apparent_power_total_kva,Apparent Power Total,kVA,meter,FLOAT32,PERIODIC,30,,Meter measurement,T2_1Y,false,r,meter.measurement.apparent_power_total_kva,DATA S2.12 Load Meter:reg163
+,cleanhedge,S2,load_meter,energy_meter,frequency_hz,Frequency,Hz,meter,FLOAT32,PERIODIC,30,,Meter measurement,T2_1Y,false,r,meter.measurement.frequency_hz,DATA S2.12 Load Meter:reg171
+,cleanhedge,S2,load_meter,energy_meter,active_energy_import_kwh,Active Energy Import,kWh,meter,FLOAT32,PERIODIC,60,,Meter active energy,T3_3Y,false,r,meter.energy.active_energy_import_kwh,DATA S2.12 Load Meter:reg199
+,cleanhedge,S2,load_meter,energy_meter,active_energy_export_kwh,Active Energy Export,kWh,meter,FLOAT32,PERIODIC,60,,Meter active energy,T3_3Y,false,r,meter.energy.active_energy_export_kwh,DATA S2.12 Load Meter:reg201
+,cleanhedge,S2,load_meter,energy_meter,active_energy_net_kwh,Active Energy Net,kWh,meter,FLOAT32,PERIODIC,60,,Meter active energy,T3_3Y,false,r,meter.energy.active_energy_net_kwh,DATA S2.12 Load Meter:reg203

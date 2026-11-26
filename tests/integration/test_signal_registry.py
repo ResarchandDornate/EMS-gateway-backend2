@@ -8,7 +8,7 @@ from src.signals.service import (
 
 # expected canonical counts verified against the workbooks
 S1_COUNT = 55  # CleanEdge v2.1 Phase 6.1: legacy 63 ornate S1 replaced by 55 normalized fields
-S2_TOTAL = 3401  # Phase F-1: +di4h +di13h fire DIs (was 3399 after Phase C)
+S2_TOTAL = 3463  # Phase F-1 3401 + Kalpa SECURE meters (S2.11 solar_meter 31 + S2.12 load_meter 31)
 S2_BY_SUBSTREAM = {
     "ems_system": 88,  # 45 Kalpa + 43 CleanEdge (Phase 5.11: 41; Phase 5.13: +2 plant daily energy)
     "pcs_extended": 343,  # 86 Kalpa + 257 CleanEdge (Phase 5.9.2: 255; Phase 5.13: +2 PCS cumulative energy)
@@ -22,6 +22,9 @@ S2_BY_SUBSTREAM = {
     "bess_aux_meter": 31,
     "combiner_box_meter": 11,
     "solar_inverter": 30,
+    # Kalpa SECURE meters (S2.11 / S2.12): 31 canonical signals each
+    "solar_meter": 31,
+    "load_meter": 31,
 }
 
 

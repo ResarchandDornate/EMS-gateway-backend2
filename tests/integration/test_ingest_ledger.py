@@ -17,6 +17,8 @@ from src.ingestion.service import (IngestDecision, canonical_hash, claim_or_reso
 from src.tenancy.gateways.models import GatewayModel
 from src.tenancy.organizations.models import OrganizationModel
 from src.tenancy.sites.models import SiteModel
+from src.main import app
+from src.config import get_settings
 
 
 async def _mk_gateway(session, *, org_key, site_key, gateway_key, client_id, secret="x"):
@@ -273,8 +275,16 @@ async def test_ingest_endpoint_503_after_auth(client, session):
                       client_id="gw_ep", secret="sec")
     tok = (await c.post("/api/v1/gateway/token",
                         json={"client_id": "gw_ep", "client_secret": "sec"})).json()["access_token"]
-    r = await c.post("/api/v1/gateway/ingest", json={}, headers={"Authorization": f"Bearer {tok}"})
-    assert r.status_code == 503
+    # The gate returns 503 only while ingest_enabled is False; force it for this test's scope so
+    # the assertion holds whatever the deployment's INGEST_ENABLED is. All other settings are kept
+    # (model_copy), so gateway auth still resolves; a disabled gate is what we are asserting.
+    app.dependency_overrides[get_settings] = lambda: get_settings().model_copy(
+        update={"ingest_enabled": False})
+    try:
+        r = await c.post("/api/v1/gateway/ingest", json={}, headers={"Authorization": f"Bearer {tok}"})
+        assert r.status_code == 503
+    finally:
+        app.dependency_overrides.pop(get_settings, None)
 
 
 # ---- 9b-ii-a item 3: canonical_hash excludes transport/identity metadata ----

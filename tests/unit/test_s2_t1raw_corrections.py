@@ -45,7 +45,7 @@ def test_writer_routes_nine_to_1y():
 
 def test_unrelated_rows_unchanged():
     rows = _rows()
-    assert sum(1 for r in rows if r["primary_stream"] == "S2") == 3401
-    assert sum(1 for r in rows if r["primary_stream"] == "S2" and r["retention_class"] == "T3_3Y") == 24
+    assert sum(1 for r in rows if r["primary_stream"] == "S2") == 3463
+    assert sum(1 for r in rows if r["primary_stream"] == "S2" and r["retention_class"] == "T3_3Y") == 30
     by = {(r["substream"], r["signal_key"]): r for r in rows if r["primary_stream"] == "S2"}
     assert by[("ems_system", "battery_system_state")]["retention_class"] == "T2_1Y"

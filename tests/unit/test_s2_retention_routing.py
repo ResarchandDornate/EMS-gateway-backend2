@@ -34,7 +34,7 @@ def test_t3_signal_keys_returns_only_T3_rows():
 
 def test_all_24_registry_T3_signals_route_to_3y():
     t3 = _index_from_seed().t3_signal_keys()
-    assert len(t3) == 24
+    assert len(t3) == 27
     for sk in t3:
         assert _bucket(sk, t3) == "telemetry_3y", sk
 
