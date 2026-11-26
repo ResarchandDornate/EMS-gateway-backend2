@@ -9,6 +9,7 @@ from src.site_profile.models import SiteProfileModel
 _WRITABLE = (
     "company_name", "address", "latitude", "longitude",
     "solar_capacity_kw", "connection_voltage_kv", "battery_capacity_kwh", "pcs_capacity_kw",
+    "state", "pincode",
     "comm_pcs_ems", "comm_pcs_battery", "comm_battery_ems",
     "comm_ems_meter_ems", "comm_solar_inverter_ems",
 )

@@ -23,6 +23,8 @@ class SiteProfileModel(BaseEntityModel):
     connection_voltage_kv: Mapped[float | None] = mapped_column(Float)
     battery_capacity_kwh: Mapped[float | None] = mapped_column(Float)
     pcs_capacity_kw: Mapped[float | None] = mapped_column(Float)
+    state: Mapped[str | None] = mapped_column(String(64))
+    pincode: Mapped[str | None] = mapped_column(String(16))
     comm_pcs_ems: Mapped[bool] = mapped_column(Boolean, default=False, server_default="false")
     comm_pcs_battery: Mapped[bool] = mapped_column(Boolean, default=False, server_default="false")
     comm_battery_ems: Mapped[bool] = mapped_column(Boolean, default=False, server_default="false")

@@ -13,6 +13,8 @@ class SiteProfileIn(BaseModel):
     connection_voltage_kv: float | None = None
     battery_capacity_kwh: float | None = None
     pcs_capacity_kw: float | None = None
+    state: str | None = None
+    pincode: str | None = None
     comm_pcs_ems: bool = False
     comm_pcs_battery: bool = False
     comm_battery_ems: bool = False
