@@ -4,6 +4,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query, status
 
 from src.influx import _ident, bucket_for, measurement_for, rows
 from src.telemetry import snapshot_cache
+from src.telemetry import series_cache
 from src.ingestion import latest_writethrough
 from src.signals.types import QUALITY_SUFFIX
 from src.signals.types import field_type
@@ -190,6 +191,12 @@ async def series(
         raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT, "invalid time range")
     fetch = limit + 1                                   # +1 to detect truncation
     site = str(site_id)
+    _ckey = series_cache.key(site, stream, substream, signal_key, asset_id, source_id, point_id, start, stop, limit)
+    _cached = await series_cache.get_cached(_ckey)
+    if _cached is not None:
+        return SeriesResponse(site_id=site_id, stream=stream, substream=substream,
+                              signal_key=signal_key, asset_id=asset_id,
+                              points=[SeriesPoint(**_p) for _p in _cached["points"]], truncated=_cached["truncated"])
     try:
         _ident("asset_id", asset_id)
         if source_id is not None:
@@ -206,6 +213,7 @@ async def series(
         raise HTTPException(status.HTTP_503_SERVICE_UNAVAILABLE, "telemetry store unavailable")
     truncated = len(recs) > limit
     pts = [SeriesPoint(time=r["time"], value=r["value"]) for r in recs[:limit]]
+    await series_cache.set_cached(_ckey, {"points": [_p.model_dump(mode="json") for _p in pts], "truncated": truncated})
     return SeriesResponse(site_id=site_id, stream=stream, substream=substream,
                           signal_key=signal_key, asset_id=asset_id, points=pts, truncated=truncated)
 

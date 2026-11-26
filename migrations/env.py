@@ -17,6 +17,7 @@ from src.rbac import models as _rbac
 from src.financials import models as _financials
 from src.ingestion import automation_models as _automation
 from src.commands import models as _commands
+from src.site_profile import models as _site_profile
 
 config = context.config
 if config.config_file_name is not None:
