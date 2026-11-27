@@ -8,7 +8,7 @@ is a closed vocabulary even though S9 keeps command_type open.
 import uuid
 from datetime import datetime, timedelta, timezone
 
-from sqlalchemy import select, update
+from sqlalchemy import and_, or_, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.commands.models import PendingCommandModel
@@ -16,6 +16,11 @@ from src.tenancy.sites.models import SiteModel
 
 # How long a raised command stays deliverable before it lapses (gateway polls ~2s).
 COMMAND_TTL_SECONDS = 120
+
+# Once served, a command is not served again until this long has passed without an S9 result.
+# The gateway de-duplicates on command_id, so this is a retry-on-silence back-off, not the
+# delivery guarantee: at a 2s poll it turns ~60 re-serves per command into ~4.
+RESERVE_AFTER_SECONDS = 30
 
 # The full downlink vocabulary. Elevated roles may send any of these.
 COMMAND_TYPES = frozenset({
@@ -70,8 +75,10 @@ async def create_command(session: AsyncSession, *, gateway_id, organization_id, 
 
 
 async def poll_pending(session: AsyncSession, *, gateway_id, limit: int) -> list[PendingCommandModel]:
-    """Expire the lapsed, return the still-deliverable, mark them served. At-least-once: a row
-    keeps appearing until an S9 result moves it off pollable or it expires."""
+    """Expire the lapsed, return the still-deliverable, mark them served. A row is served when
+    pending, then held back until RESERVE_AFTER_SECONDS pass with no S9 result before it is
+    re-served -- so a delivered command is not re-sent on every 2s poll, only retried on silence.
+    An S9 result (apply_results) or expiry takes it off the poll for good."""
     now = datetime.now(timezone.utc)
     await session.execute(
         update(PendingCommandModel)
@@ -80,18 +87,20 @@ async def poll_pending(session: AsyncSession, *, gateway_id, limit: int) -> list
                PendingCommandModel.expires_at_utc <= now)
         .values(status="expired", closed_at_utc=now)
     )
+    reserve_before = now - timedelta(seconds=RESERVE_AFTER_SECONDS)
     rows = (await session.execute(
         select(PendingCommandModel)
         .where(PendingCommandModel.gateway_id == gateway_id,
-               PendingCommandModel.status.in_(_POLLABLE),
-               PendingCommandModel.expires_at_utc > now)
+               PendingCommandModel.expires_at_utc > now,
+               or_(PendingCommandModel.status == "pending",
+                   and_(PendingCommandModel.status == "served",
+                        PendingCommandModel.served_at_utc <= reserve_before)))
         .order_by(PendingCommandModel.issued_at_utc)
         .limit(limit)
     )).scalars().all()
     for r in rows:
-        if r.status == "pending":
-            r.status = "served"
-            r.served_at_utc = now
+        r.status = "served"
+        r.served_at_utc = now           # resets the back-off clock on each delivery
     await session.commit()
     return rows
 

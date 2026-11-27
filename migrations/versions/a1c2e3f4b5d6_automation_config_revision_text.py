@@ -1,7 +1,7 @@
 """automation_status_records.config_revision -> text (gateway sends a hex hash)
 
 Revision ID: a1c2e3f4b5d6
-Revises: e8f9a0b1c2d3
+Revises: a6b7c8d9e0f1
 Create Date: 2026-11-27
 
 The gateway reports config_revision as a 16-char hex hash (e.g. bf2d28614f02d16e),
@@ -13,7 +13,7 @@ import sqlalchemy as sa
 from alembic import op
 
 revision = "a1c2e3f4b5d6"
-down_revision = "e8f9a0b1c2d3"
+down_revision = "a6b7c8d9e0f1"
 branch_labels = None
 depends_on = None
 
