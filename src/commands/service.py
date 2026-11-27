@@ -12,6 +12,7 @@ from sqlalchemy import select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.commands.models import PendingCommandModel
+from src.tenancy.sites.models import SiteModel
 
 # How long a raised command stays deliverable before it lapses (gateway polls ~2s).
 COMMAND_TTL_SECONDS = 120
@@ -92,6 +93,29 @@ async def poll_pending(session: AsyncSession, *, gateway_id, limit: int) -> list
             r.served_at_utc = now
     await session.commit()
     return rows
+
+
+async def site_key_of(session: AsyncSession, site_id) -> str:
+    """The contract site key the gateway expects in a command, not our site UUID."""
+    return (await session.execute(
+        select(SiteModel.site_key).where(SiteModel.id == site_id)
+    )).scalar_one()
+
+
+def to_pending(row: PendingCommandModel, gateway_key: str, site_key: str) -> dict:
+    """A queued command in the gateway's contract shape: contract keys for gateway_id /
+    site_id (not our UUIDs) so the gateway validator accepts it."""
+    return {
+        "command_id": row.command_id,
+        "gateway_id": gateway_key,
+        "site_id": site_key,
+        "command_type": row.command_type,
+        "requested_role": row.requested_role,
+        "arguments": row.arguments,
+        "requires_readback": row.requires_readback,
+        "issued_at_utc": row.issued_at_utc,
+        "expires_at_utc": row.expires_at_utc,
+    }
 
 
 async def apply_results(session: AsyncSession, *, gateway_id, records) -> None:

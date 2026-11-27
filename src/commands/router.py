@@ -1,7 +1,5 @@
 """Pair-control command endpoints. POST is the UI downlink (user auth + role rule);
 GET /pending is the gateway's poll (gateway auth). Results come back on S9, not here."""
-import uuid
-
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -39,10 +37,12 @@ async def create_command(body: CreateCommandIn, user=Depends(get_current_user),
 
 
 @router.get("/pending", response_model=PendingBatch)
-async def pending(gateway_id: uuid.UUID = Query(...), limit: int = Query(20, ge=1, le=100),
+async def pending(gateway_id: str = Query(...), limit: int = Query(20, ge=1, le=100),
                   gw=Depends(get_current_gateway), session: AsyncSession = Depends(get_session)):
-    # A gateway polls only its own queue: the token's gateway must match the asked id.
-    if gw.id != gateway_id:
+    # The gateway polls by its contract key, not our UUID. The token still decides whose
+    # queue it is, so cross-check the asked key against the authenticated gateway.
+    if gw.gateway_key != gateway_id:
         raise HTTPException(403, "Gateway mismatch")
-    rows = await service.poll_pending(session, gateway_id=gateway_id, limit=limit)
-    return {"commands": rows}
+    site_key = await service.site_key_of(session, gw.site_id)
+    rows = await service.poll_pending(session, gateway_id=gw.id, limit=limit)
+    return {"commands": [service.to_pending(r, gw.gateway_key, site_key) for r in rows]}

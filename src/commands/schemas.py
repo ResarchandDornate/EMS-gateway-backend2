@@ -35,7 +35,10 @@ class CommandOut(BaseModel):              # POST /commands response + the UI lif
 class PendingCommand(BaseModel):          # one item the gateway receives from the poll
     model_config = _C
     command_id: uuid.UUID
+    gateway_id: str                       # contract key (gateway_key), not our UUID
+    site_id: str                          # contract key (site_key)
     command_type: str
+    requested_role: str
     arguments: Any
     requires_readback: bool
     issued_at_utc: datetime
