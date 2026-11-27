@@ -21,6 +21,7 @@ COMMAND_TTL_SECONDS = 120
 COMMAND_TYPES = frozenset({
     "pair_precheck", "pair_automatic_start", "pair_set_power", "pair_zero_power",
     "pair_safe_stop", "pair_abort", "safe_stop_all", "automation_enable", "automation_disable",
+    "automation_set_schedule",
 })
 
 # The site_operator-safe subset: stops and automation-disable only.

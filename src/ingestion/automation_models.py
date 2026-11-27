@@ -9,7 +9,7 @@ in `payload`, with a few promoted columns for querying.
 import uuid
 from datetime import datetime
 
-from sqlalchemy import BigInteger, Boolean, DateTime, Integer, String, UniqueConstraint, func
+from sqlalchemy import Boolean, DateTime, Integer, String, UniqueConstraint, func
 from sqlalchemy.dialects.postgresql import JSONB, UUID
 from sqlalchemy.orm import Mapped, mapped_column
 
@@ -30,7 +30,7 @@ class AutomationStatusRecordModel(BaseEntityModel):
     record_index: Mapped[int] = mapped_column(Integer)
 
     automation_enabled: Mapped[bool | None] = mapped_column(Boolean)
-    config_revision: Mapped[int | None] = mapped_column(BigInteger)
+    config_revision: Mapped[str | None] = mapped_column(String(64))  # gateway sends a hex hash, not an int
     supervisor_alive: Mapped[bool | None] = mapped_column(Boolean)
     phase: Mapped[str | None] = mapped_column(String(32))
     direction: Mapped[str | None] = mapped_column(String(16))

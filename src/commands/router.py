@@ -37,12 +37,14 @@ async def create_command(body: CreateCommandIn, user=Depends(get_current_user),
 
 
 @router.get("/pending", response_model=PendingBatch)
-async def pending(gateway_id: str = Query(...), limit: int = Query(20, ge=1, le=100),
+async def pending(gateway_id: str = Query(...), site_id: str | None = Query(None),
+                  limit: int = Query(20, ge=0, le=100),
                   gw=Depends(get_current_gateway), session: AsyncSession = Depends(get_session)):
-    # The gateway polls by its contract key, not our UUID. The token still decides whose
-    # queue it is, so cross-check the asked key against the authenticated gateway.
-    if gw.gateway_key != gateway_id:
-        raise HTTPException(403, "Gateway mismatch")
-    site_key = await service.site_key_of(session, gw.site_id)
+    # The token, not the query ids, decides whose queue this is: poll_pending reads by the
+    # authenticated gateway's own id, so a gateway can only ever get its own commands (the
+    # same identity ingest trusts via resolve_gateway_identity). The gateway knows itself by
+    # a contract id the backend does not store, so echo the gateway_id/site_id it sends
+    # straight back and its validator sees the exact ids it uses.
+    site = site_id or await service.site_key_of(session, gw.site_id)
     rows = await service.poll_pending(session, gateway_id=gw.id, limit=limit)
-    return {"commands": [service.to_pending(r, gw.gateway_key, site_key) for r in rows]}
+    return {"commands": [service.to_pending(r, gateway_id, site) for r in rows]}

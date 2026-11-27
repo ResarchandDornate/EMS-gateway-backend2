@@ -122,7 +122,7 @@ class AutomationStatusOut(BaseModel):     # S10 automation_status (CG-28)
     gateway_id: uuid.UUID
     site_id: uuid.UUID
     automation_enabled: bool | None
-    config_revision: int | None
+    config_revision: str | None
     supervisor_alive: bool | None
     phase: str | None
     direction: str | None
