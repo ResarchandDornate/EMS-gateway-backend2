@@ -14,7 +14,7 @@ from src.config import get_settings
 
 _ph = PasswordHasher()        # Argon2id
 _ALGO = "HS256"
-ACCESS_TOKEN_MINUTES = 15
+ACCESS_TOKEN_MINUTES = 60 * 24 * 12   # 12 days
 GATEWAY_TOKEN_MINUTES = 30
 USER_AUDIENCE = "user"
 GATEWAY_AUDIENCE = "gateway"
